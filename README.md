@@ -1,6 +1,6 @@
-# Grazer - Web Content Scraper
+# Graze - Reddit/Web Content Scraper
 
-The Grazer component is responsible for scraping content from Reddit and external websites. It fetches posts from specified subreddits, filters them based on configurable criteria, and processes the external content into clean Markdown format.
+The graze component is responsible for scraping content from Reddit and external websites. It fetches posts from specified subreddits, filters them based on configurable criteria, and processes the external content into clean Markdown format.
 
 ## Features
 
@@ -55,7 +55,7 @@ blacklist = test, demo
 
 ### Tag Removal Configuration
 
-The Grazer supports flexible HTML tag removal with Gentoo-style override syntax:
+Graze supports flexible HTML tag removal with Gentoo-style override syntax:
 
 #### Global Tags
 Add a `[global]` section to define tags that will be removed from all scraped sites:
@@ -154,7 +154,7 @@ blacklist = AI, cryptocurrency
 
 ## Usage
 
-### Running the Grazer
+### Running Graze
 ```bash
 python src/main.py
 ```
@@ -185,7 +185,7 @@ Each scraped URL is stored as a Markdown file with a SHA256 hash of the URL as t
 
 ## HTML Processing
 
-The Grazer performs extensive HTML cleaning with configurable tag removal:
+Graze performs extensive HTML cleaning with configurable tag removal:
 
 #### Default Tag Removal
 If no configuration is specified, the following tags are removed:
@@ -223,7 +223,7 @@ Comprehensive error handling for:
 
 ### Project Structure
 ```
-grazer/
+graze/
 ├── src/
 │   └── main.py          # Main application logic
 ├── tests/               # Unit tests
@@ -241,8 +241,8 @@ python -m pytest tests/
 
 ### Build and Run
 ```bash
-docker build -t grazer .
-docker run -v $(pwd)/output:/app/output grazer
+docker build -t graze .
+docker run -v $(pwd)/output:/app/output graze
 ```
 
 ## Contributing
