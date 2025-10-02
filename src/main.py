@@ -57,15 +57,15 @@ def post_process_html(file_path, tags_to_remove):
 
     # Remove all attributes from all tags except for href and src
     for tag in soup.find_all(True):
-        if tag.name == 'a':
-            if 'href' in tag.attrs:
-                href = tag['href']
-                if href.startswith('http'):
-                    tag['href'] = '/' + href.split('/', 3)[-1]
-        elif tag.name == 'img':
-            if 'src' in tag.attrs:
-                src = tag['src']
-                tag['src'] = os.path.basename(src)
+        if tag.name == "a":
+            if "href" in tag.attrs:
+                href = tag["href"]
+                if href.startswith("http"):
+                    tag["href"] = "/" + href.split("/", 3)[-1]
+        elif tag.name == "img":
+            if "src" in tag.attrs:
+                src = tag["src"]
+                tag["src"] = os.path.basename(src)
         else:
             tag.attrs = {}
 
@@ -94,22 +94,21 @@ def post_process_html(file_path, tags_to_remove):
     print(f"Finished post-processing {file_path}")
 
 
-def scrape_url(url, output_dir, driver_path, tags_to_remove):
+def scrape_url(url, output_dir, tags_to_remove):
     """Scrapes the content of a URL using Selenium."""
     try:
         options = Options()
-        options.binary_location = "/usr/bin/firefox-bin"
         options.add_argument("--headless")
-        driver = webdriver.Firefox(
-            service=Service(executable_path=driver_path), options=options
-        )
+        # Use webdriver_manager to automatically manage GeckoDriver
+        service = Service(GeckoDriverManager().install())
+        driver = webdriver.Firefox(service=service, options=options)
         driver.get(url)
         time.sleep(5)  # Allow time for the page to load
-        html = driver.execute_script("return document.getElementsByTagName('html')[0].innerHTML")
+        html = driver.execute_script(
+            "return document.getElementsByTagName('html')[0].innerHTML"
+        )
         file_path = os.path.join(output_dir, f"{hash_url(url)}.html")
-        with open(
-            file_path, "w", encoding="utf-8"
-        ) as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(html)
         driver.quit()
         post_process_html(file_path, tags_to_remove)
@@ -135,19 +134,25 @@ def main():
     else:
         processed_urls = set()
 
-    driver_path = "/home/ber/.wdm/drivers/geckodriver/linux64/v0.36.0/geckodriver"
-
     # Get global tags to remove
     global_tags_to_remove = []
     if "global" in config and "remove_tags" in config["global"]:
-        global_tags_to_remove = [tag.strip() for tag in config["global"]["remove_tags"].split(",") if tag.strip()]
+        global_tags_to_remove = [
+            tag.strip()
+            for tag in config["global"]["remove_tags"].split(",")
+            if tag.strip()
+        ]
 
     for section in config.sections():
         if section == "global":
             continue
 
         subreddit_url = config[section]["url"]
-        blacklist = [term.strip() for term in config[section]["blacklist"].split(",") if term.strip()]
+        blacklist = [
+            term.strip()
+            for term in config[section]["blacklist"].split(",")
+            if term.strip()
+        ]
 
         # Get section-specific tags to remove and handle overrides
         section_tags_to_remove = []
@@ -164,7 +169,9 @@ def main():
                         section_tags_to_remove.append(tag)
 
         # Start with global tags, remove any that are marked to keep
-        effective_global_tags = [tag for tag in global_tags_to_remove if tag not in tags_to_keep]
+        effective_global_tags = [
+            tag for tag in global_tags_to_remove if tag not in tags_to_keep
+        ]
 
         # Combine effective global tags and section tags, removing duplicates
         all_tags_to_remove = list(set(effective_global_tags + section_tags_to_remove))
@@ -181,7 +188,7 @@ def main():
 
             if url_hash not in processed_urls:
                 print(f"Scraping {external_url}")
-                if scrape_url(external_url, subreddit_output_dir, driver_path, all_tags_to_remove):
+                if scrape_url(external_url, subreddit_output_dir, all_tags_to_remove):
                     processed_urls.add(url_hash)
                     print(f"Successfully scraped {external_url}")
                 else:

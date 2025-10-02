@@ -1,7 +1,14 @@
 FROM python:3.11-slim
 
 # Install Firefox
-RUN apt-get update && apt-get install -y firefox-esr
+RUN apt-get update && apt-get install -y \
+    firefox-esr \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Firefox binary location
+ENV FIREFOX_BIN=/usr/bin/firefox
 
 WORKDIR /app
 
