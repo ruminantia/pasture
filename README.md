@@ -162,7 +162,7 @@ python src/main.py
 ### Output Structure
 ```
 output/
-├── 2024-01-15/
+├── year-month-day/
 │   ├── worldnews/
 │   │   ├── abc123def456.md
 │   │   └── xyz789uvw012.md
