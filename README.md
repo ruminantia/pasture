@@ -1,16 +1,17 @@
-# Pasture - Reddit/Web Content Scraper with Scheduled Scraping
+# Pasture - Multi-Source Content Scraper with Scheduled Scraping
 
-The Pasture component is responsible for scraping content from Reddit and external websites. It fetches posts from specified subreddits, filters them based on configurable criteria, processes the external content into clean Markdown format, and can run continuously with scheduled scraping intervals.
+The Pasture component is responsible for scraping content from multiple sources (pastures) including Reddit, HackerNews, and other websites. It fetches posts from configured sources, filters them based on configurable criteria, processes the external content into clean Markdown format, and can run continuously with scheduled scraping intervals.
 
 ## Features
 
-- **Reddit API Integration**: Fetches posts from subreddit JSON feeds
-- **Content Filtering**: Filters out stickied posts, self-posts, and posts containing blacklisted terms
+- **Multi-Source Support**: Modular architecture supporting Reddit, HackerNews, and custom sources
+- **Content Filtering**: Filters out unwanted posts and posts containing blacklisted terms
 - **Web Scraping**: Uses Selenium with headless Firefox to scrape external URLs
 - **HTML Processing**: Cleans HTML content by removing unwanted tags and attributes
 - **Markdown Conversion**: Converts processed HTML to clean Markdown format
 - **Duplicate Detection**: Maintains history of processed URLs to avoid duplicates
-- **Scheduled Scraping**: Runs continuously with configurable intervals per subreddit
+- **Scheduled Scraping**: Runs continuously with configurable intervals per pasture
+- **Extensible Architecture**: Easy to add new pasture types
 
 ## Installation
 
@@ -26,31 +27,58 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Edit `config.ini` to configure which subreddits to monitor:
+Edit `config.ini` to configure which pastures to monitor:
 
 ```ini
 [global]
+# Global settings apply to all pastures unless overridden
 remove_tags = script, style, noscript, iframe, button, svg, footer, nav
 
+# Pasture configuration examples
+# Each pasture section represents a source to scrape
+# Supported types: reddit, hackernews (future), etc.
+
 [worldnews]
+# Reddit pasture (auto-detected from URL)
+type = reddit
 url = https://www.reddit.com/r/worldnews.json
-blacklist = Trump, Israel, Hamas, Palestine, Iran, Qatar, Russia, Ukraine
-remove_tags = -nav, -footer  # Keep nav and footer tags for this subreddit
+blacklist = Trump, Netanyahu, Israel, Hamas, Palestine, Palestinian, Iran, Qatar, Russia, Ukraine
+interval = 30
 
-[technology]
-url = https://www.reddit.com/r/technology.json
-blacklist = AI, ChatGPT, OpenAI, Microsoft, Google
-remove_tags = header, aside, form  # Add additional tags to remove
+[arstechnica]
+# Reddit pasture with custom tag removal
+type = reddit
+url = https://www.reddit.com/domain/arstechnica.com.json
+blacklist = Trump, COVID, government
+remove_tags = -nav, -footer
+interval = 60
 
-[custom_site]
-url = https://www.reddit.com/domain/example.com.json
-blacklist = test, demo
-# No remove_tags specified - uses only global tags
+[LocalLLaMA]
+# Reddit pasture with no blacklist
+type = reddit
+url = https://www.reddit.com/r/LocalLLaMA.json
+blacklist =
+interval = 120
+
+# Example HackerNews pasture (commented out for future use)
+# [hackernews_top]
+# type = hackernews
+# url = https://hacker-news.firebaseio.com/v0/topstories.json
+# blacklist = cryptocurrency, bitcoin, ethereum
+# interval = 60
+
+# Example custom pasture (commented out for future use)
+# [tech_blog]
+# type = custom
+# url = https://example.com/tech-feed.json
+# blacklist = sponsored, advertisement
+# interval = 120
 ```
 
 ### Configuration Options
-- **Section Name**: Arbitrary identifier for the subreddit
-- **url**: The JSON endpoint of the subreddit (must end with `.json`)
+- **Section Name**: Arbitrary identifier for the pasture
+- **type**: Pasture type (reddit, hackernews, etc.) - auto-detected if not specified
+- **url**: The source URL or API endpoint
 - **blacklist**: Comma-separated list of terms to exclude (case-insensitive)
 - **remove_tags**: Comma-separated list of HTML tags to remove during processing
 - **interval**: Scraping interval in minutes (optional, defaults to 60 minutes)
@@ -66,8 +94,8 @@ Add a `[global]` section to define tags that will be removed from all scraped si
 remove_tags = script, style, noscript, iframe, button, svg, footer, nav
 ```
 
-#### Section-Specific Tags
-Add tags to individual sections to modify the global behavior:
+#### Pasture-Specific Tags
+Add tags to individual pastures to modify the global behavior:
 ```ini
 [worldnews]
 remove_tags = header, aside, form  # Add tags to global set
@@ -83,83 +111,7 @@ remove_tags = -nav, header, aside  # Keep nav, add header and aside
 - **No prefix**: Add tag to removal list (e.g., `header`, `aside`)
 - **`-` prefix**: Remove tag from global list (e.g., `-nav`, `-footer`)
 - **No `remove_tags`**: Use only global tags (if defined)
-- **No `[global]` section**: Each section uses only its own tags
-
-### Configuration Examples
-
-#### Example 1: Basic Global Configuration
-```ini
-[global]
-remove_tags = script, style, noscript, iframe
-
-[worldnews]
-url = https://www.reddit.com/r/worldnews.json
-blacklist = politics, election
-
-[technology]
-url = https://www.reddit.com/r/technology.json
-blacklist = AI, cryptocurrency
-interval = 120
-```
-- **worldnews**: Removes `script, style, noscript, iframe`, scrapes every 60 minutes (default)
-- **technology**: Removes `script, style, noscript, iframe`, scrapes every 120 minutes
-
-#### Example 2: Global + Section Additions
-```ini
-[global]
-remove_tags = script, style, noscript, iframe
-
-[worldnews]
-url = https://www.reddit.com/r/worldnews.json
-blacklist = politics, election
-remove_tags = button, svg, footer
-interval = 30
-
-[technology]
-url = https://www.reddit.com/r/technology.json
-blacklist = AI, cryptocurrency
-remove_tags = header, aside, form
-interval = 60
-```
-- **worldnews**: Removes `script, style, noscript, iframe, button, svg, footer`, scrapes every 30 minutes
-- **technology**: Removes `script, style, noscript, iframe, header, aside, form`, scrapes every 60 minutes
-
-#### Example 3: Global + Section Overrides
-```ini
-[global]
-remove_tags = script, style, noscript, iframe, button, svg, footer, nav
-
-[worldnews]
-url = https://www.reddit.com/r/worldnews.json
-blacklist = politics, election
-remove_tags = -nav, -footer  # Keep nav and footer
-interval = 15
-
-[technology]
-url = https://www.reddit.com/r/technology.json
-blacklist = AI, cryptocurrency
-remove_tags = -nav, header, aside  # Keep nav, add header and aside
-interval = 45
-```
-- **worldnews**: Removes `script, style, noscript, iframe, button, svg` (keeps `nav, footer`), scrapes every 15 minutes
-- **technology**: Removes `script, style, noscript, iframe, button, svg, footer, header, aside` (keeps `nav`), scrapes every 45 minutes
-
-#### Example 4: No Global Section
-```ini
-[worldnews]
-url = https://www.reddit.com/r/worldnews.json
-blacklist = politics, election
-remove_tags = script, style, noscript
-interval = 30
-
-[technology]
-url = https://www.reddit.com/r/technology.json
-blacklist = AI, cryptocurrency
-# No remove_tags - uses default tags
-interval = 60
-```
-- **worldnews**: Removes only `script, style, noscript`, scrapes every 30 minutes
-- **technology**: Removes default tags `script, style, noscript, iframe, button, svg, footer, nav`, scrapes every 60 minutes
+- **No `[global]` section**: Each pasture uses only its own tags
 
 ## Usage
 
@@ -180,47 +132,101 @@ output/
 │   ├── worldnews/
 │   │   ├── abc123def456.md
 │   │   └── xyz789uvw012.md
-│   └── technology/
+│   └── arstechnica/
 │       └── def456ghi789.md
 └── processed_urls.json
 ```
 
 Each scraped URL is stored as a Markdown file with a SHA256 hash of the URL as the filename.
 
+## Architecture
+
+The project uses a modular architecture with the following structure:
+
+```
+pasture/
+├── src/
+│   ├── pastures/           # Pasture implementations
+│   │   ├── base/          # Base Pasture abstract class
+│   │   ├── reddit/        # Reddit pasture implementation
+│   │   ├── hackernews/    # HackerNews pasture implementation
+│   │   └── __init__.py    # Pasture factory
+│   ├── core/              # Core utilities
+│   │   └── scraper.py     # Shared scraping functions
+│   └── main.py            # Main application logic
+├── config.ini             # Configuration file
+├── requirements.txt       # Python dependencies
+└── Dockerfile            # Container configuration
+```
+
+### Adding New Pasture Types
+
+To add a new pasture type:
+
+1. Create a new directory under `src/pastures/` (e.g., `src/pastures/custom/`)
+2. Implement a class that inherits from `Pasture` base class
+3. Register the new type in the PastureFactory
+
+Example implementation:
+
+```python
+from typing import List, Dict, Any
+from ..base import Pasture
+
+class CustomPasture(Pasture):
+    def fetch_posts(self) -> List[Dict[str, Any]]:
+        # Implement fetching logic
+        pass
+
+    def filter_posts(self, posts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        # Implement filtering logic
+        pass
+
+    def get_url_from_post(self, post: Dict[str, Any]) -> str:
+        # Extract URL from post
+        pass
+```
+
+Register in `src/pastures/__init__.py`:
+
+```python
+from .custom import CustomPasture
+
+class PastureFactory:
+    _pasture_types = {
+        "reddit": RedditPasture,
+        "hackernews": HackerNewsPasture,
+        "custom": CustomPasture,  # Add new type
+    }
+```
+
 ## How It Works
 
-1. **Subreddit Fetching**: Retrieves posts from configured subreddit JSON feeds
-2. **Content Filtering**: Removes stickied posts, self-posts, and posts containing blacklisted terms
-3. **URL Processing**: Checks if URL has been processed before to avoid duplicates
-4. **Web Scraping**: Uses headless Firefox via Selenium to fetch external content
-5. **HTML Cleaning**: Removes scripts, styles, and unwanted tags while preserving links and images
-6. **Markdown Conversion**: Converts cleaned HTML to Markdown format
-7. **Storage**: Saves processed content with URL hash as filename
-8. **Scheduled Execution**: Automatically re-scrapes subreddits at configured intervals (if specified)
+1. **Pasture Detection**: Determines pasture type from configuration or URL patterns
+2. **Content Fetching**: Retrieves posts from configured sources using pasture-specific logic
+3. **Content Filtering**: Removes unwanted posts based on pasture-specific criteria
+4. **URL Processing**: Checks if URL has been processed before to avoid duplicates
+5. **Web Scraping**: Uses headless Firefox via Selenium to fetch external content
+6. **HTML Cleaning**: Removes scripts, styles, and unwanted tags while preserving links and images
+7. **Markdown Conversion**: Converts cleaned HTML to Markdown format
+8. **Storage**: Saves processed content with URL hash as filename
+9. **Scheduled Execution**: Automatically re-scrapes pastures at configured intervals (if specified)
 
-## HTML Processing
+## Available Pasture Types
 
-Pasture performs extensive HTML cleaning with configurable tag removal:
+### Reddit Pasture
+- **Type**: `reddit`
+- **URL Format**: Reddit JSON endpoints (e.g., `https://www.reddit.com/r/subreddit.json`)
+- **Features**: Filters stickied posts, self-posts, and blacklisted terms
 
-#### Default Tag Removal
-If no configuration is specified, the following tags are removed:
-- `script`, `style`, `noscript`, `iframe`, `button`, `svg`, `footer`, `nav`
-
-#### Configurable Tag Removal
-You can customize which tags are removed using the `remove_tags` configuration option:
-- **Global configuration**: Applies to all scraped sites
-- **Per-section configuration**: Modifies global behavior for specific sites
-- **Gentoo-style syntax**: Use `-` prefix to keep specific tags
-
-#### HTML Processing Features
-- **Preserved Attributes**: Only `href` (for links) and `src` (for images) are kept
-- **Link Processing**: External URLs are converted to relative paths
-- **Image Processing**: Image filenames are extracted from URLs
-- **Duplicate Prevention**: Global and section tags are combined without duplicates
+### HackerNews Pasture
+- **Type**: `hackernews`
+- **URL Format**: Hacker News API endpoints
+- **Features**: Fetches top stories and filters based on title blacklist
 
 ## Dependencies
 
-- **requests**: HTTP requests for Reddit API
+- **requests**: HTTP requests for API calls
 - **selenium**: Web browser automation
 - **webdriver-manager**: GeckoDriver management
 - **beautifulsoup4**: HTML parsing and manipulation
@@ -231,33 +237,16 @@ You can customize which tags are removed using the `remove_tags` configuration o
 
 Comprehensive error handling for:
 - Network timeouts and connection errors
-- Invalid JSON responses from Reddit
+- Invalid API responses
 - Web scraping failures
 - File I/O operations
-
-## Development
-
-### Project Structure
-```
-pasture/
-├── src/
-│   └── main.py          # Main application logic
-├── tests/               # Unit tests
-├── config.ini          # Configuration file
-├── requirements.txt    # Python dependencies
-└── Dockerfile          # Container configuration
-```
-
-### Running Tests
-```bash
-python -m pytest tests/
-```
+- Pasture-specific errors
 
 ## Docker Support
 
 ### Using the Management Script
 
-The project includes a convenient `run-docker.sh` script for managing the scraper. The script automatically detects and uses Docker Compose when available:
+The project includes a convenient `run-docker.sh` script for managing the scraper:
 
 ```bash
 # Make the script executable (first time only)
@@ -287,8 +276,6 @@ chmod +x run-docker.sh
 
 ### Using Docker Compose
 
-The project includes a `docker-compose.yml` file for container orchestration:
-
 ```bash
 # Build and start in background
 docker compose up -d
@@ -306,34 +293,13 @@ docker compose run --rm -T pasture-scraper
 docker compose build
 ```
 
-### Manual Docker Commands
-
-If you prefer to use Docker commands directly:
-
-```bash
-# Build the image
-docker build -t pasture .
-
-# Run once with mounted volumes (single execution)
-docker run --rm \
-  -v $(pwd)/config.ini:/app/config.ini \
-  -v $(pwd)/output:/app/output \
-  pasture
-
-# Run in background (continuous mode with scheduled scraping)
-docker run -d \
-  --name pasture-scraper \
-  -v $(pwd)/config.ini:/app/config.ini \
-  -v $(pwd)/output:/app/output \
-  pasture
-```
-
 ## Contributing
 
 1. Follow the existing code style and patterns
 2. Add tests for new functionality
 3. Update documentation accordingly
 4. Ensure error handling is comprehensive
+5. When adding new pasture types, follow the abstract base class interface
 
 ## License
 
@@ -342,7 +308,7 @@ This project is provided as-is without warranty. Use responsibly and in complian
 ## Disclaimer
 
 This tool is intended for educational and research purposes. Users are responsible for:
-- Complying with Reddit's API terms of service
+- Complying with API terms of service for each source
 - Respecting website robots.txt files
 - Obtaining proper permissions for web scraping
 - Using the tool ethically and legally
