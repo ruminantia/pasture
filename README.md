@@ -239,10 +239,56 @@ python -m pytest tests/
 
 ## Docker Support
 
-### Build and Run
+### Using the Management Script
+
+The project includes a convenient `run-docker.sh` script for managing the scraper:
+
 ```bash
+# Make the script executable (first time only)
+chmod +x run-docker.sh
+
+# Run the scraper once (default behavior)
+./run-docker.sh
+
+# Start the scraper in background mode
+./run-docker.sh start
+
+# View logs of running container
+./run-docker.sh logs
+
+# Stop the background container
+./run-docker.sh stop
+
+# Rebuild the Docker image
+./run-docker.sh build
+
+# Show container status
+./run-docker.sh status
+
+# Show help with all available commands
+./run-docker.sh help
+```
+
+### Manual Docker Commands
+
+If you prefer to use Docker commands directly:
+
+```bash
+# Build the image
 docker build -t graze .
-docker run -v $(pwd)/output:/app/output graze
+
+# Run once with mounted volumes
+docker run --rm \
+  -v $(pwd)/config.ini:/app/config.ini \
+  -v $(pwd)/output:/app/output \
+  graze
+
+# Run in background
+docker run -d \
+  --name graze-scraper \
+  -v $(pwd)/config.ini:/app/config.ini \
+  -v $(pwd)/output:/app/output \
+  graze
 ```
 
 ## Contributing
