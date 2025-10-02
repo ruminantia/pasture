@@ -3,3 +3,4 @@ selenium
 webdriver-manager
 beautifulsoup4
 markdownify
+schedule

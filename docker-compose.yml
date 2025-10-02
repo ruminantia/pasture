@@ -12,6 +12,18 @@ services:
       - PYTHONPATH=/app
     stdin_open: true
     tty: true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import requests; requests.get('https://www.reddit.com/r/worldnews.json', timeout=30)",
+        ]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 2m
     networks:
       - graze-network
 

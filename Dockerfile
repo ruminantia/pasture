@@ -18,4 +18,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Run the scraper in continuous mode
 CMD ["python3", "src/main.py"]

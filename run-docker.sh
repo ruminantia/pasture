@@ -119,7 +119,7 @@ start_scraper() {
     # Start the Graze scraper in detached mode (background).
     #
     # This runs the container as a background service, freeing up the terminal.
-    # The scraper will run once and exit unless configured otherwise.
+    # The scraper will run continuously with scheduled scraping intervals.
     print_status "Starting Ruminantia Graze scraper in detached mode..."
 
     if [ "$USE_COMPOSE" = true ]; then
@@ -135,6 +135,9 @@ start_scraper() {
     print_status "Scraper started successfully!"
     echo "To view logs: ./run-docker.sh logs"
     echo "To stop the scraper: ./run-docker.sh stop"
+    echo ""
+    echo "The scraper will run continuously and scrape subreddits at configured intervals."
+    echo "Check config.ini for interval settings per subreddit."
 }
 
 stop_scraper() {
@@ -179,6 +182,7 @@ view_logs() {
     print_status "Showing scraper logs (Ctrl+C to exit)..."
 
     if [ "$USE_COMPOSE" = true ]; then
+        # For Docker Compose, show logs in follow mode
         docker compose logs -f
     else
         docker logs -f graze-scraper
@@ -218,10 +222,11 @@ start_attached() {
     # Start the scraper in attached mode for debugging.
     #
     # Runs the container in the foreground, showing real-time output.
-    # The terminal will be occupied until the scraper completes or is stopped.
+    # The terminal will be occupied until the scraper is stopped with Ctrl+C.
     check_config_file
     print_status "Starting Ruminantia Graze scraper in attached mode..."
-    print_warning "Terminal will be occupied until scraper completes"
+    print_warning "Press Ctrl+C to stop the scraper"
+    print_warning "Terminal will be occupied until scraper is stopped"
 
     if [ "$USE_COMPOSE" = true ]; then
         docker compose up
@@ -237,8 +242,8 @@ start_attached() {
 run_once() {
     # Run the scraper once and exit (attached mode).
     #
-    # This is the default behavior - run a single scrape session.
-    # Useful for scheduled runs or manual execution.
+    # This runs a single scrape session and then exits.
+    # Useful for manual execution or testing.
     check_config_file
     print_status "Running Ruminantia Graze scraper (single run)..."
 
@@ -279,11 +284,12 @@ show_help() {
     echo "  If no command is provided, the scraper runs once and exits."
     echo ""
     echo "Operational Notes:"
-    echo "  - The scraper typically runs once and exits (not a long-running service)"
-    echo "  - Use 'start' for background execution"
-    echo "  - Use 'run' or no command for single execution"
+    echo "  - The scraper runs continuously with scheduled scraping intervals"
+    echo "  - Use 'start' for background execution (recommended)"
+    echo "  - Use 'run' for single execution (testing/debugging)"
     echo "  - Data is preserved in mounted volumes across runs"
     echo "  - Configuration is loaded from config.ini"
+    echo "  - Set 'interval' in config.ini sections to control scraping frequency (minutes)"
     echo ""
     if [ "$USE_COMPOSE" = true ]; then
         echo "Mode: Docker Compose (docker-compose.yml detected)"
@@ -292,9 +298,9 @@ show_help() {
     fi
     echo ""
     echo "Examples:"
-    echo "  ./run-docker.sh           # Run scraper once (default)"
-    echo "  ./run-docker.sh start     # Start in background"
-    echo "  ./run-docker.sh logs      # View logs of running container"
+    echo "  ./run-docker.sh           # Run scraper once (testing)"
+    echo "  ./run-docker.sh start     # Start in background (recommended)"
+    echo "  ./run-docker.sh logs      # View real-time logs"
     echo "  ./run-docker.sh stop      # Stop background container"
     echo "  ./run-docker.sh build     # Rebuild Docker image"
     echo ""
@@ -346,7 +352,7 @@ case "${1:-}" in
         show_help
         ;;
     "")
-        # Default behavior: run once and exit
+        # Default behavior: run once and exit (for testing)
         check_config_file
         build_image
         run_once

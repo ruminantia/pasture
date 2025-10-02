@@ -1,6 +1,6 @@
-# Graze - Reddit/Web Content Scraper
+# Graze - Reddit/Web Content Scraper with Scheduled Scraping
 
-The graze component is responsible for scraping content from Reddit and external websites. It fetches posts from specified subreddits, filters them based on configurable criteria, and processes the external content into clean Markdown format.
+The graze component is responsible for scraping content from Reddit and external websites. It fetches posts from specified subreddits, filters them based on configurable criteria, processes the external content into clean Markdown format, and can run continuously with scheduled scraping intervals.
 
 ## Features
 
@@ -10,6 +10,7 @@ The graze component is responsible for scraping content from Reddit and external
 - **HTML Processing**: Cleans HTML content by removing unwanted tags and attributes
 - **Markdown Conversion**: Converts processed HTML to clean Markdown format
 - **Duplicate Detection**: Maintains history of processed URLs to avoid duplicates
+- **Scheduled Scraping**: Runs continuously with configurable intervals per subreddit
 
 ## Installation
 
@@ -52,6 +53,7 @@ blacklist = test, demo
 - **url**: The JSON endpoint of the subreddit (must end with `.json`)
 - **blacklist**: Comma-separated list of terms to exclude (case-insensitive)
 - **remove_tags**: Comma-separated list of HTML tags to remove during processing
+- **interval**: Scraping interval in minutes (optional, defaults to 60 minutes)
 
 ### Tag Removal Configuration
 
@@ -97,9 +99,10 @@ blacklist = politics, election
 [technology]
 url = https://www.reddit.com/r/technology.json
 blacklist = AI, cryptocurrency
+interval = 120
 ```
-- **worldnews**: Removes `script, style, noscript, iframe`
-- **technology**: Removes `script, style, noscript, iframe`
+- **worldnews**: Removes `script, style, noscript, iframe`, scrapes every 60 minutes (default)
+- **technology**: Removes `script, style, noscript, iframe`, scrapes every 120 minutes
 
 #### Example 2: Global + Section Additions
 ```ini
@@ -110,14 +113,16 @@ remove_tags = script, style, noscript, iframe
 url = https://www.reddit.com/r/worldnews.json
 blacklist = politics, election
 remove_tags = button, svg, footer
+interval = 30
 
 [technology]
 url = https://www.reddit.com/r/technology.json
 blacklist = AI, cryptocurrency
 remove_tags = header, aside, form
+interval = 60
 ```
-- **worldnews**: Removes `script, style, noscript, iframe, button, svg, footer`
-- **technology**: Removes `script, style, noscript, iframe, header, aside, form`
+- **worldnews**: Removes `script, style, noscript, iframe, button, svg, footer`, scrapes every 30 minutes
+- **technology**: Removes `script, style, noscript, iframe, header, aside, form`, scrapes every 60 minutes
 
 #### Example 3: Global + Section Overrides
 ```ini
@@ -128,14 +133,16 @@ remove_tags = script, style, noscript, iframe, button, svg, footer, nav
 url = https://www.reddit.com/r/worldnews.json
 blacklist = politics, election
 remove_tags = -nav, -footer  # Keep nav and footer
+interval = 15
 
 [technology]
 url = https://www.reddit.com/r/technology.json
 blacklist = AI, cryptocurrency
 remove_tags = -nav, header, aside  # Keep nav, add header and aside
+interval = 45
 ```
-- **worldnews**: Removes `script, style, noscript, iframe, button, svg` (keeps `nav, footer`)
-- **technology**: Removes `script, style, noscript, iframe, button, svg, footer, header, aside` (keeps `nav`)
+- **worldnews**: Removes `script, style, noscript, iframe, button, svg` (keeps `nav, footer`), scrapes every 15 minutes
+- **technology**: Removes `script, style, noscript, iframe, button, svg, footer, header, aside` (keeps `nav`), scrapes every 45 minutes
 
 #### Example 4: No Global Section
 ```ini
@@ -143,19 +150,26 @@ remove_tags = -nav, header, aside  # Keep nav, add header and aside
 url = https://www.reddit.com/r/worldnews.json
 blacklist = politics, election
 remove_tags = script, style, noscript
+interval = 30
 
 [technology]
 url = https://www.reddit.com/r/technology.json
 blacklist = AI, cryptocurrency
 # No remove_tags - uses default tags
+interval = 60
 ```
-- **worldnews**: Removes only `script, style, noscript`
-- **technology**: Removes default tags `script, style, noscript, iframe, button, svg, footer, nav`
+- **worldnews**: Removes only `script, style, noscript`, scrapes every 30 minutes
+- **technology**: Removes default tags `script, style, noscript, iframe, button, svg, footer, nav`, scrapes every 60 minutes
 
 ## Usage
 
 ### Running Graze
 ```bash
+# Single run (for testing)
+python src/main.py
+
+# Continuous mode with scheduled scraping (production)
+# The application automatically detects interval configuration and runs continuously
 python src/main.py
 ```
 
@@ -182,6 +196,7 @@ Each scraped URL is stored as a Markdown file with a SHA256 hash of the URL as t
 5. **HTML Cleaning**: Removes scripts, styles, and unwanted tags while preserving links and images
 6. **Markdown Conversion**: Converts cleaned HTML to Markdown format
 7. **Storage**: Saves processed content with URL hash as filename
+8. **Scheduled Execution**: Automatically re-scrapes subreddits at configured intervals (if specified)
 
 ## HTML Processing
 
@@ -210,6 +225,7 @@ You can customize which tags are removed using the `remove_tags` configuration o
 - **webdriver-manager**: GeckoDriver management
 - **beautifulsoup4**: HTML parsing and manipulation
 - **markdownify**: HTML to Markdown conversion
+- **schedule**: Task scheduling for interval-based scraping
 
 ## Error Handling
 
@@ -247,10 +263,10 @@ The project includes a convenient `run-docker.sh` script for managing the scrape
 # Make the script executable (first time only)
 chmod +x run-docker.sh
 
-# Run the scraper once (default behavior)
+# Run the scraper once (for testing)
 ./run-docker.sh
 
-# Start the scraper in background mode
+# Start the scraper in background mode (recommended for production)
 ./run-docker.sh start
 
 # View logs of running container
@@ -298,13 +314,13 @@ If you prefer to use Docker commands directly:
 # Build the image
 docker build -t graze .
 
-# Run once with mounted volumes
+# Run once with mounted volumes (single execution)
 docker run --rm \
   -v $(pwd)/config.ini:/app/config.ini \
   -v $(pwd)/output:/app/output \
   graze
 
-# Run in background
+# Run in background (continuous mode with scheduled scraping)
 docker run -d \
   --name graze-scraper \
   -v $(pwd)/config.ini:/app/config.ini \
