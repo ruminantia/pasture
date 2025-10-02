@@ -241,7 +241,7 @@ python -m pytest tests/
 
 ### Using the Management Script
 
-The project includes a convenient `run-docker.sh` script for managing the scraper:
+The project includes a convenient `run-docker.sh` script for managing the scraper. The script automatically detects and uses Docker Compose when available:
 
 ```bash
 # Make the script executable (first time only)
@@ -267,6 +267,27 @@ chmod +x run-docker.sh
 
 # Show help with all available commands
 ./run-docker.sh help
+```
+
+### Using Docker Compose
+
+The project includes a `docker-compose.yml` file for container orchestration:
+
+```bash
+# Build and start in background
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop containers
+docker compose down
+
+# Run once (single execution)
+docker compose run --rm -T graze-scraper
+
+# Build images
+docker compose build
 ```
 
 ### Manual Docker Commands

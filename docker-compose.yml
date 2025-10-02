@@ -1,0 +1,24 @@
+services:
+  graze-scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ruminantia-graze
+    restart: unless-stopped
+    volumes:
+      - graze-output:/app/output
+      - ./config.ini:/app/config.ini:ro
+    environment:
+      - PYTHONPATH=/app
+    stdin_open: true
+    tty: true
+    networks:
+      - graze-network
+
+volumes:
+  graze-output:
+    driver: local
+
+networks:
+  graze-network:
+    driver: bridge

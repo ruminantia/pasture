@@ -43,6 +43,19 @@ print_error() {
 }
 
 # =============================================================================
+# DOCKER COMPOSE DETECTION
+# =============================================================================
+
+# Check if docker-compose.yml exists
+if [ -f "docker-compose.yml" ]; then
+    USE_COMPOSE=true
+    print_status "Using Docker Compose configuration"
+else
+    USE_COMPOSE=false
+    print_warning "docker-compose.yml not found, using direct Docker commands"
+fi
+
+# =============================================================================
 # CONFIGURATION VALIDATION FUNCTIONS
 # =============================================================================
 
@@ -108,11 +121,17 @@ start_scraper() {
     # This runs the container as a background service, freeing up the terminal.
     # The scraper will run once and exit unless configured otherwise.
     print_status "Starting Ruminantia Graze scraper in detached mode..."
-    docker run -d \
-        --name graze-scraper \
-        -v "$(pwd)/config.ini:/app/config.ini" \
-        -v "$(pwd)/output:/app/output" \
-        graze
+
+    if [ "$USE_COMPOSE" = true ]; then
+        docker compose up -d
+    else
+        docker run -d \
+            --name graze-scraper \
+            -v "$(pwd)/config.ini:/app/config.ini" \
+            -v "$(pwd)/output:/app/output" \
+            graze
+    fi
+
     print_status "Scraper started successfully!"
     echo "To view logs: ./run-docker.sh logs"
     echo "To stop the scraper: ./run-docker.sh stop"
@@ -124,8 +143,14 @@ stop_scraper() {
     # This stops the container and removes it.
     # All data in mounted volumes (output files) is preserved.
     print_status "Stopping Ruminantia Graze scraper..."
-    docker stop graze-scraper 2>/dev/null || true
-    docker rm graze-scraper 2>/dev/null || true
+
+    if [ "$USE_COMPOSE" = true ]; then
+        docker compose down
+    else
+        docker stop graze-scraper 2>/dev/null || true
+        docker rm graze-scraper 2>/dev/null || true
+    fi
+
     print_status "Scraper stopped successfully!"
 }
 
@@ -135,8 +160,14 @@ restart_scraper() {
     # Useful for applying configuration changes or running another scrape.
     # The container is stopped and started with the same settings.
     print_status "Restarting Ruminantia Graze scraper..."
-    stop_scraper
-    start_scraper
+
+    if [ "$USE_COMPOSE" = true ]; then
+        docker compose restart
+    else
+        stop_scraper
+        start_scraper
+    fi
+
     print_status "Scraper restarted successfully!"
 }
 
@@ -146,7 +177,12 @@ view_logs() {
     # Shows the scraper's output stream. Useful for debugging and monitoring.
     # Press Ctrl+C to exit log viewing mode.
     print_status "Showing scraper logs (Ctrl+C to exit)..."
-    docker logs -f graze-scraper
+
+    if [ "$USE_COMPOSE" = true ]; then
+        docker compose logs -f
+    else
+        docker logs -f graze-scraper
+    fi
 }
 
 build_image() {
@@ -154,7 +190,13 @@ build_image() {
     #
     # Useful when Dockerfile changes are made or to ensure a clean build.
     print_status "Building Docker image..."
-    docker build -t graze .
+
+    if [ "$USE_COMPOSE" = true ]; then
+        docker compose build
+    else
+        docker build -t graze .
+    fi
+
     print_status "Image built successfully!"
 }
 
@@ -164,7 +206,12 @@ show_status() {
     # Shows running/stopped status, container names, and other details.
     # Useful for verifying the scraper's operational state.
     print_status "Container status:"
-    docker ps -a --filter "name=graze-scraper"
+
+    if [ "$USE_COMPOSE" = true ]; then
+        docker compose ps
+    else
+        docker ps -a --filter "name=graze-scraper"
+    fi
 }
 
 start_attached() {
@@ -175,11 +222,16 @@ start_attached() {
     check_config_file
     print_status "Starting Ruminantia Graze scraper in attached mode..."
     print_warning "Terminal will be occupied until scraper completes"
-    docker run -it \
-        --rm \
-        -v "$(pwd)/config.ini:/app/config.ini" \
-        -v "$(pwd)/output:/app/output" \
-        graze
+
+    if [ "$USE_COMPOSE" = true ]; then
+        docker compose up
+    else
+        docker run -it \
+            --rm \
+            -v "$(pwd)/config.ini:/app/config.ini" \
+            -v "$(pwd)/output:/app/output" \
+            graze
+    fi
 }
 
 run_once() {
@@ -189,10 +241,15 @@ run_once() {
     # Useful for scheduled runs or manual execution.
     check_config_file
     print_status "Running Ruminantia Graze scraper (single run)..."
-    docker run --rm \
-        -v "$(pwd)/config.ini:/app/config.ini" \
-        -v "$(pwd)/output:/app/output" \
-        graze
+
+    if [ "$USE_COMPOSE" = true ]; then
+        docker compose run --rm -T graze-scraper
+    else
+        docker run --rm \
+            -v "$(pwd)/config.ini:/app/config.ini" \
+            -v "$(pwd)/output:/app/output" \
+            graze
+    fi
 }
 
 show_help() {
@@ -227,6 +284,12 @@ show_help() {
     echo "  - Use 'run' or no command for single execution"
     echo "  - Data is preserved in mounted volumes across runs"
     echo "  - Configuration is loaded from config.ini"
+    echo ""
+    if [ "$USE_COMPOSE" = true ]; then
+        echo "Mode: Docker Compose (docker-compose.yml detected)"
+    else
+        echo "Mode: Direct Docker commands"
+    fi
     echo ""
     echo "Examples:"
     echo "  ./run-docker.sh           # Run scraper once (default)"
