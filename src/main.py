@@ -3,6 +3,7 @@ import json
 import os
 import time
 import schedule
+import logging
 from datetime import datetime
 from typing import Dict, Any, Set
 
@@ -12,6 +13,12 @@ from core.scraper import (
     load_processed_urls,
     save_processed_urls,
 )
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 def run_single_scrape(config: configparser.ConfigParser) -> None:
@@ -26,7 +33,7 @@ def run_single_scrape(config: configparser.ConfigParser) -> None:
     processed_urls_file = os.path.join(output_base_dir, "processed_urls.json")
     processed_urls = load_processed_urls(processed_urls_file)
 
-    print(f"Starting scrape at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"Starting scrape at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     for section in config.sections():
         if section == "global":
@@ -37,10 +44,10 @@ def run_single_scrape(config: configparser.ConfigParser) -> None:
             pasture = PastureFactory.create_pasture(section, pasture_config)
             processed_urls = scrape_pasture(pasture, output_base_dir, processed_urls)
         except Exception as e:
-            print(f"Error processing pasture '{section}': {e}")
+            logger.error(f"Error processing pasture '{section}': {e}")
 
     save_processed_urls(processed_urls_file, processed_urls)
-    print(f"Completed scrape at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"Completed scrape at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def scrape_scheduled_pasture(section: str, config: configparser.ConfigParser) -> None:
@@ -56,7 +63,7 @@ def scrape_scheduled_pasture(section: str, config: configparser.ConfigParser) ->
     processed_urls_file = os.path.join(output_base_dir, "processed_urls.json")
     processed_urls = load_processed_urls(processed_urls_file)
 
-    print(
+    logger.info(
         f"Starting scheduled scrape of {section} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     )
 
@@ -65,10 +72,10 @@ def scrape_scheduled_pasture(section: str, config: configparser.ConfigParser) ->
         pasture = PastureFactory.create_pasture(section, pasture_config)
         processed_urls = scrape_pasture(pasture, output_base_dir, processed_urls)
     except Exception as e:
-        print(f"Error processing pasture '{section}': {e}")
+        logger.error(f"Error processing pasture '{section}': {e}")
 
     save_processed_urls(processed_urls_file, processed_urls)
-    print(
+    logger.info(
         f"Completed scheduled scrape of {section} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     )
 
@@ -79,7 +86,7 @@ def setup_scheduler(config: configparser.ConfigParser) -> None:
     Args:
         config: Configuration parser with pasture sections
     """
-    print("Setting up scheduled scraping...")
+    logger.info("Setting up scheduled scraping...")
 
     for section in config.sections():
         if section == "global":
@@ -91,9 +98,9 @@ def setup_scheduler(config: configparser.ConfigParser) -> None:
             schedule.every(interval_minutes).minutes.do(
                 lambda section=section: scrape_scheduled_pasture(section, config)
             )
-            print(f"Scheduled {section} to run every {interval_minutes} minutes")
+            logger.info(f"Scheduled {section} to run every {interval_minutes} minutes")
         except ValueError:
-            print(
+            logger.warning(
                 f"Invalid interval for {section}: {interval}. Using default 60 minutes."
             )
             schedule.every(60).minutes.do(
@@ -129,13 +136,13 @@ def main() -> None:
         # Set up scheduler
         setup_scheduler(config)
 
-        print("Scheduler started. Press Ctrl+C to exit.")
+        logger.info("Scheduler started. Press Ctrl+C to exit.")
         try:
             while True:
                 schedule.run_pending()
                 time.sleep(1)
         except KeyboardInterrupt:
-            print("Scheduler stopped.")
+            logger.info("Scheduler stopped.")
     else:
         # Run single scrape
         run_single_scrape(config)

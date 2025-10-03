@@ -4,7 +4,7 @@
 # Ruminantia Pasture - Docker Container Management Script
 #
 # This script provides a convenient command-line interface for managing the
-# Reddit/web content scraper using Docker. It handles configuration validation,
+# multi-source content scraper using Docker. It handles configuration validation,
 # container lifecycle management, and user-friendly error messages.
 # =============================================================================
 
@@ -64,7 +64,7 @@ check_config_file() {
     #
     # This function:
     # 1. Checks for the existence of the config.ini file
-    # 2. Verifies that at least one subreddit is configured
+    # 2. Verifies that at least one pasture is configured
     # 3. Creates necessary output directories if they don't exist
     # 4. Provides helpful guidance if configuration is missing
     #
@@ -75,31 +75,38 @@ check_config_file() {
         echo "Configuration file is required for the scraper to function."
         echo ""
         echo "Setup instructions:"
-        echo "1. Edit config.ini to configure which subreddits to monitor"
-        echo "2. Add sections for each subreddit you want to scrape"
+        echo "1. Edit config.ini to configure which pastures to monitor"
+        echo "2. Add sections for each content source you want to scrape"
         echo ""
         echo "Example config.ini structure:"
         echo "[global]"
         echo "remove_tags = script, style, noscript, iframe"
         echo ""
         echo "[worldnews]"
+        echo "type = reddit"
         echo "url = https://www.reddit.com/r/worldnews.json"
         echo "blacklist = politics, election"
         echo ""
-        echo "[technology]"
-        echo "url = https://www.reddit.com/r/technology.json"
-        echo "blacklist = AI, cryptocurrency"
+        echo "[hackernews_top]"
+        echo "type = hackernews"
+        echo "blacklist = cryptocurrency, bitcoin"
+        echo ""
         exit 1
     fi
 
-    # Verify that config.ini has at least one subreddit configured (not just [global])
+    # Verify that config.ini has at least one pasture configured (not just [global])
     if ! grep -q "^\[.*\]" config.ini | grep -v "\[global\]" | head -1; then
-        print_warning "config.ini exists but may not have any subreddits configured"
-        echo "Add sections for subreddits you want to scrape, for example:"
+        print_warning "config.ini exists but may not have any pastures configured"
+        echo "Add sections for content sources you want to scrape, for example:"
         echo ""
         echo "[worldnews]"
+        echo "type = reddit"
         echo "url = https://www.reddit.com/r/worldnews.json"
         echo "blacklist = politics, election"
+        echo ""
+        echo "[hackernews_top]"
+        echo "type = hackernews"
+        echo "blacklist = cryptocurrency, bitcoin"
         echo ""
         echo "See README.md for complete configuration options."
     fi
@@ -136,8 +143,8 @@ start_scraper() {
     echo "To view logs: ./run-docker.sh logs"
     echo "To stop the scraper: ./run-docker.sh stop"
     echo ""
-    echo "The scraper will run continuously and scrape subreddits at configured intervals."
-    echo "Check config.ini for interval settings per subreddit."
+    echo "The scraper will run continuously and scrape content from configured pastures."
+    echo "Check config.ini for interval settings per pasture."
 }
 
 stop_scraper() {
@@ -262,10 +269,11 @@ show_help() {
     #
     # Provides usage instructions, available commands, and examples.
     # This is the default help message shown when users need assistance.
-    echo "Ruminantia Pasture - Content Scraper Management Script"
-    echo "===================================================="
+    echo "Ruminantia Pasture - Multi-Source Content Scraper Management Script"
+    echo "=================================================================="
     echo ""
-    echo "A convenient interface for managing the Reddit/web content scraper."
+    echo "A convenient interface for managing the multi-source content scraper."
+    echo "Supports Reddit, HackerNews, and other content sources (pastures)."
     echo ""
     echo "Usage: ./run-docker.sh [command]"
     echo ""
@@ -285,6 +293,7 @@ show_help() {
     echo ""
     echo "Operational Notes:"
     echo "  - The scraper runs continuously with scheduled scraping intervals"
+    echo "  - Supports multiple content sources (pastures): Reddit, HackerNews, etc."
     echo "  - Use 'start' for background execution (recommended)"
     echo "  - Use 'run' for single execution (testing/debugging)"
     echo "  - Data is preserved in mounted volumes across runs"
