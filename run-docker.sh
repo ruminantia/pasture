@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================================================
-# Ruminantia Graze - Docker Container Management Script
+# Ruminantia Pasture - Docker Container Management Script
 #
 # This script provides a convenient command-line interface for managing the
 # Reddit/web content scraper using Docker. It handles configuration validation,
@@ -116,20 +116,20 @@ check_config_file() {
 # =============================================================================
 
 start_scraper() {
-    # Start the Graze scraper in detached mode (background).
+    # Start the Pasture scraper in detached mode (background).
     #
     # This runs the container as a background service, freeing up the terminal.
     # The scraper will run continuously with scheduled scraping intervals.
-    print_status "Starting Ruminantia Graze scraper in detached mode..."
+    print_status "Starting Ruminantia Pasture scraper in detached mode..."
 
     if [ "$USE_COMPOSE" = true ]; then
         docker compose up -d
     else
         docker run -d \
-            --name graze-scraper \
+            --name pasture-scraper \
             -v "$(pwd)/config.ini:/app/config.ini" \
             -v "$(pwd)/output:/app/output" \
-            graze
+            pasture
     fi
 
     print_status "Scraper started successfully!"
@@ -145,13 +145,13 @@ stop_scraper() {
     #
     # This stops the container and removes it.
     # All data in mounted volumes (output files) is preserved.
-    print_status "Stopping Ruminantia Graze scraper..."
+    print_status "Stopping Ruminantia Pasture scraper..."
 
     if [ "$USE_COMPOSE" = true ]; then
         docker compose down
     else
-        docker stop graze-scraper 2>/dev/null || true
-        docker rm graze-scraper 2>/dev/null || true
+        docker stop pasture-scraper 2>/dev/null || true
+        docker rm pasture-scraper 2>/dev/null || true
     fi
 
     print_status "Scraper stopped successfully!"
@@ -162,7 +162,7 @@ restart_scraper() {
     #
     # Useful for applying configuration changes or running another scrape.
     # The container is stopped and started with the same settings.
-    print_status "Restarting Ruminantia Graze scraper..."
+    print_status "Restarting Ruminantia Pasture scraper..."
 
     if [ "$USE_COMPOSE" = true ]; then
         docker compose restart
@@ -185,7 +185,7 @@ view_logs() {
         # For Docker Compose, show logs in follow mode
         docker compose logs -f
     else
-        docker logs -f graze-scraper
+        docker logs -f pasture-scraper
     fi
 }
 
@@ -198,7 +198,7 @@ build_image() {
     if [ "$USE_COMPOSE" = true ]; then
         docker compose build
     else
-        docker build -t graze .
+        docker build -t pasture .
     fi
 
     print_status "Image built successfully!"
@@ -214,7 +214,7 @@ show_status() {
     if [ "$USE_COMPOSE" = true ]; then
         docker compose ps
     else
-        docker ps -a --filter "name=graze-scraper"
+        docker ps -a --filter "name=pasture-scraper"
     fi
 }
 
@@ -224,7 +224,7 @@ start_attached() {
     # Runs the container in the foreground, showing real-time output.
     # The terminal will be occupied until the scraper is stopped with Ctrl+C.
     check_config_file
-    print_status "Starting Ruminantia Graze scraper in attached mode..."
+    print_status "Starting Ruminantia Pasture scraper in attached mode..."
     print_warning "Press Ctrl+C to stop the scraper"
     print_warning "Terminal will be occupied until scraper is stopped"
 
@@ -235,7 +235,7 @@ start_attached() {
             --rm \
             -v "$(pwd)/config.ini:/app/config.ini" \
             -v "$(pwd)/output:/app/output" \
-            graze
+            pasture
     fi
 }
 
@@ -245,15 +245,15 @@ run_once() {
     # This runs a single scrape session and then exits.
     # Useful for manual execution or testing.
     check_config_file
-    print_status "Running Ruminantia Graze scraper (single run)..."
+    print_status "Running Ruminantia Pasture scraper (single run)..."
 
     if [ "$USE_COMPOSE" = true ]; then
-        docker compose run --rm -T graze-scraper
+        docker compose run --rm -T pasture-scraper
     else
         docker run --rm \
             -v "$(pwd)/config.ini:/app/config.ini" \
             -v "$(pwd)/output:/app/output" \
-            graze
+            pasture
     fi
 }
 
@@ -262,7 +262,7 @@ show_help() {
     #
     # Provides usage instructions, available commands, and examples.
     # This is the default help message shown when users need assistance.
-    echo "Ruminantia Graze - Content Scraper Management Script"
+    echo "Ruminantia Pasture - Content Scraper Management Script"
     echo "===================================================="
     echo ""
     echo "A convenient interface for managing the Reddit/web content scraper."

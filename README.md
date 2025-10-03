@@ -1,6 +1,6 @@
-# Graze - Reddit/Web Content Scraper with Scheduled Scraping
+# Pasture - Reddit/Web Content Scraper with Scheduled Scraping
 
-The graze component is responsible for scraping content from Reddit and external websites. It fetches posts from specified subreddits, filters them based on configurable criteria, processes the external content into clean Markdown format, and can run continuously with scheduled scraping intervals.
+The Pasture component is responsible for scraping content from Reddit and external websites. It fetches posts from specified subreddits, filters them based on configurable criteria, processes the external content into clean Markdown format, and can run continuously with scheduled scraping intervals.
 
 ## Features
 
@@ -57,7 +57,7 @@ blacklist = test, demo
 
 ### Tag Removal Configuration
 
-Graze supports flexible HTML tag removal with Gentoo-style override syntax:
+Pasture supports flexible HTML tag removal with Gentoo-style override syntax:
 
 #### Global Tags
 Add a `[global]` section to define tags that will be removed from all scraped sites:
@@ -163,7 +163,7 @@ interval = 60
 
 ## Usage
 
-### Running Graze
+### Running Pasture
 ```bash
 # Single run (for testing)
 python src/main.py
@@ -200,7 +200,7 @@ Each scraped URL is stored as a Markdown file with a SHA256 hash of the URL as t
 
 ## HTML Processing
 
-Graze performs extensive HTML cleaning with configurable tag removal:
+Pasture performs extensive HTML cleaning with configurable tag removal:
 
 #### Default Tag Removal
 If no configuration is specified, the following tags are removed:
@@ -239,7 +239,7 @@ Comprehensive error handling for:
 
 ### Project Structure
 ```
-graze/
+pasture/
 ├── src/
 │   └── main.py          # Main application logic
 ├── tests/               # Unit tests
@@ -300,7 +300,7 @@ docker compose logs -f
 docker compose down
 
 # Run once (single execution)
-docker compose run --rm -T graze-scraper
+docker compose run --rm -T pasture-scraper
 
 # Build images
 docker compose build
@@ -312,20 +312,20 @@ If you prefer to use Docker commands directly:
 
 ```bash
 # Build the image
-docker build -t graze .
+docker build -t pasture .
 
 # Run once with mounted volumes (single execution)
 docker run --rm \
   -v $(pwd)/config.ini:/app/config.ini \
   -v $(pwd)/output:/app/output \
-  graze
+  pasture
 
 # Run in background (continuous mode with scheduled scraping)
 docker run -d \
-  --name graze-scraper \
+  --name pasture-scraper \
   -v $(pwd)/config.ini:/app/config.ini \
   -v $(pwd)/output:/app/output \
-  graze
+  pasture
 ```
 
 ## Contributing

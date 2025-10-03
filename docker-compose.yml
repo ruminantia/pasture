@@ -1,12 +1,12 @@
 services:
-  graze-scraper:
+  pasture-scraper:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ruminantia-graze
+    container_name: ruminantia-pasture
     restart: unless-stopped
     volumes:
-      - graze-output:/app/output
+      - pasture-output:/app/output
       - ./config.ini:/app/config.ini:ro
     environment:
       - PYTHONPATH=/app
@@ -25,12 +25,12 @@ services:
       retries: 3
       start_period: 2m
     networks:
-      - graze-network
+      - pasture-network
 
 volumes:
-  graze-output:
+  pasture-output:
     driver: local
 
 networks:
-  graze-network:
+  pasture-network:
     driver: bridge
