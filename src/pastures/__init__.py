@@ -2,6 +2,7 @@ from typing import Dict, Any, Type
 from .base import Pasture
 from .reddit import RedditPasture
 from .hackernews import HackerNewsPasture
+from .rss import RSSPasture
 
 
 class PastureFactory:
@@ -10,6 +11,7 @@ class PastureFactory:
     _pasture_types = {
         "reddit": RedditPasture,
         "hackernews": HackerNewsPasture,
+        "rss": RSSPasture,
     }
 
     @classmethod
@@ -60,6 +62,13 @@ class PastureFactory:
             or "hacker-news.firebaseio.com" in url
         ):
             return "hackernews"
+        elif (
+            url.endswith(".rss")
+            or url.endswith(".xml")
+            or "/rss" in url
+            or "/feed" in url
+        ):
+            return "rss"
         # Add more auto-detection patterns as needed
 
         # Default to reddit for backward compatibility

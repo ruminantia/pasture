@@ -111,16 +111,138 @@ class CachedGeckoDriverManager:
         return "geckodriver"  # Still try system binary as last resort
 
 
+def normalize_url(url: str) -> str:
+    """Normalize URL by removing tracking parameters and standardizing format.
+
+    Args:
+        url: URL to normalize
+
+    Returns:
+        Normalized URL without tracking parameters
+    """
+    from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+
+    try:
+        parsed = urlparse(url)
+
+        # Common tracking parameters to remove
+        tracking_params = [
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_term",
+            "utm_content",
+            "ref",
+            "source",
+            "medium",
+            "campaign",
+            "content",
+            "term",
+            "fbclid",
+            "gclid",
+            "msclkid",
+            "trk",
+            "tracking",
+            "si",
+            "igshid",
+            "feature",
+            "share",
+            "mc_cid",
+            "mc_eid",
+            "_hsenc",
+            "_hsmi",
+            "hsCtaTracking",
+            "mkt_tok",
+            "pk_source",
+            "pk_medium",
+            "pk_campaign",
+            "pk_keyword",
+            "pk_content",
+            "ncid",
+            "CMP",
+            "cmpid",
+            "ito",
+            "ito",
+            "nr_email_referer",
+            "via",
+            "from",
+            "shared",
+            "fb_action_ids",
+            "fb_ref",
+            "wt_mc",
+            "wt_zmc",
+            "wt_zsrc",
+            "CNDID",
+            "mbid",
+            "linkCode",
+            "tag",
+            "linkId",
+            "creativeASIN",
+            "ascsubtag",
+            "psc",
+            "ved",
+            "ei",
+            "gs_lcp",
+            "oq",
+            "aqs",
+            "sourceid",
+            "ie",
+            "rlz",
+            "gws_rd",
+            "sa",
+            "esrc",
+            "form",
+        ]
+
+        # Remove tracking parameters from query string
+        if parsed.query:
+            query_params = parse_qs(parsed.query, keep_blank_values=True)
+            filtered_params = {}
+
+            for key, value in query_params.items():
+                # Keep parameter if it's not a tracking parameter
+                if key.lower() not in [p.lower() for p in tracking_params]:
+                    filtered_params[key] = value[0] if len(value) == 1 else value
+
+            # Rebuild query string without tracking parameters
+            new_query = urlencode(filtered_params, doseq=True)
+        else:
+            new_query = ""
+
+        # Reconstruct URL without tracking parameters
+        normalized = urlunparse(
+            (
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                parsed.params,
+                new_query,
+                parsed.fragment,
+            )
+        )
+
+        # Remove trailing slash for consistency
+        if normalized.endswith("/") and len(normalized) > 1:
+            normalized = normalized.rstrip("/")
+
+        return normalized
+
+    except Exception:
+        # If normalization fails, return original URL
+        return url
+
+
 def hash_url(url: str) -> str:
-    """Hash a URL using SHA256.
+    """Hash a URL using SHA256 after normalization.
 
     Args:
         url: URL to hash
 
     Returns:
-        SHA256 hash of the URL
+        SHA256 hash of the normalized URL
     """
-    return hashlib.sha256(url.encode("utf-8")).hexdigest()
+    normalized_url = normalize_url(url)
+    return hashlib.sha256(normalized_url.encode("utf-8")).hexdigest()
 
 
 def post_process_html(file_path: str, tags_to_remove: List[str]) -> None:

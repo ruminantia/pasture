@@ -1,15 +1,16 @@
 # Pasture - Multi-Source Content Scraper with Scheduled Scraping
 
-The Pasture component is responsible for scraping content from multiple sources (pastures) including Reddit, HackerNews, and other websites. It fetches posts from configured sources, filters them based on configurable criteria, processes the external content into clean Markdown format, and can run continuously with scheduled scraping intervals.
+The Pasture component is responsible for scraping content from multiple sources (pastures) including Reddit, HackerNews, RSS feeds, and other websites. It fetches posts from configured sources, filters them based on configurable criteria, processes the external content into clean Markdown format, and can run continuously with scheduled scraping intervals.
 
 ## Features
 
-- **Multi-Source Support**: Modular architecture supporting Reddit, HackerNews, and custom sources
+- **Multi-Source Support**: Modular architecture supporting Reddit, HackerNews, RSS feeds, and custom sources
 - **Content Filtering**: Filters out unwanted posts and posts containing blacklisted terms
 - **Web Scraping**: Uses Selenium with headless Firefox to scrape external URLs
 - **HTML Processing**: Cleans HTML content by removing unwanted tags and attributes
 - **Markdown Conversion**: Converts processed HTML to clean Markdown format
-- **Duplicate Detection**: Maintains history of processed URLs to avoid duplicates
+- **Duplicate Detection**: Maintains history of processed URLs to avoid duplicates across all pastures
+- **URL Normalization**: Removes tracking parameters to prevent duplicate content from different sources
 - **Scheduled Scraping**: Runs continuously with configurable intervals per pasture
 - **Extensible Architecture**: Easy to add new pasture types
 
@@ -36,7 +37,7 @@ remove_tags = script, style, noscript, iframe, button, svg, footer, nav
 
 # Pasture configuration examples
 # Each pasture section represents a source to scrape
-# Supported types: reddit, hackernews, etc.
+# Supported types: reddit, hackernews, rss, etc.
 
 [worldnews]
 # Reddit pasture (auto-detected from URL)
@@ -78,11 +79,12 @@ interval = 60
 
 ### Configuration Options
 - **Section Name**: Arbitrary identifier for the pasture
-- **type**: Pasture type (reddit, hackernews, etc.) - auto-detected if not specified
-- **url**: The source URL or API endpoint (optional for HackerNews)
+- **type**: Pasture type (reddit, hackernews, rss, etc.) - auto-detected if not specified
+- **url**: The source URL or API endpoint (optional for HackerNews, required for RSS)
 - **blacklist**: Comma-separated list of terms to exclude (case-insensitive)
 - **remove_tags**: Comma-separated list of HTML tags to remove during processing
 - **interval**: Scraping interval in minutes (optional, defaults to 60 minutes)
+- **max_age_days**: Maximum age of posts in days (RSS pastures only, optional)
 
 ### Tag Removal Configuration
 
@@ -213,6 +215,36 @@ class PastureFactory:
 8. **Storage**: Saves processed content with URL hash as filename
 9. **Scheduled Execution**: Automatically re-scrapes pastures at configured intervals (if specified)
 
+## Duplicate Detection
+
+Pasture uses intelligent duplicate detection to prevent scraping the same content multiple times:
+
+### How It Works:
+1. **URL Normalization**: All URLs are normalized by removing common tracking parameters (utm_source, ref, fbclid, etc.)
+2. **SHA256 Hashing**: Normalized URLs are hashed for efficient comparison
+3. **Global Tracking**: Processed URL hashes are stored in `output/processed_urls.json`
+4. **Cross-Pasture Checking**: Before scraping any URL, all pastures check the global processed URLs set
+
+### Example:
+```python
+# These URLs all point to the same content but have different tracking parameters:
+https://example.com/article/
+https://example.com/article/?utm_source=reddit
+https://example.com/article/?ref=twitter
+https://example.com/article/?fbclid=abc123
+
+# After normalization, they all become:
+https://example.com/article
+
+# Result: Same SHA256 hash → Treated as duplicate → Only scraped once
+```
+
+### Benefits:
+- ✅ No duplicate content across different pastures
+- ✅ Efficient storage and bandwidth usage
+- ✅ Clean organization despite multiple sources
+- ✅ Automatic handling of tracking parameters
+
 ## Available Pasture Types
 
 ### Reddit Pasture
@@ -226,6 +258,15 @@ class PastureFactory:
 - **Features**: Fetches top 50 stories, filters based on title blacklist, excludes Ask HN and job posts
 - **Note**: URL is optional - HackerNews pasture uses default API endpoints if not provided
 
+### RSS Pasture
+- **Type**: `rss`
+- **URL Format**: RSS/Atom feed URLs (e.g., `https://example.com/feed.rss`, `https://example.com/atom.xml`)
+- **Features**: Fetches items from RSS/Atom feeds, supports RSS 2.0, Atom, and RDF formats
+- **Additional Options**: 
+  - `max_age_days`: Filter items by publication date (optional)
+  - Blacklist applies to both title and description fields
+- **Auto-detection**: URLs ending in `.rss`, `.xml`, or containing `/rss/` or `/feed/`
+
 ## Configuration Examples
 
 ### HackerNews Pasture
@@ -234,6 +275,23 @@ class PastureFactory:
 type = hackernews
 # url = https://hacker-news.firebaseio.com/v0/topstories.json  # Optional
 blacklist = cryptocurrency, bitcoin, ethereum
+interval = 60
+```
+
+### RSS Pasture
+```ini
+[tech_blog_rss]
+type = rss
+url = https://example.com/feed.rss
+blacklist = sponsored, advertisement
+max_age_days = 7  # Only include items from last 7 days
+interval = 120
+
+[news_site_rss]
+type = rss
+url = https://example.com/atom.xml
+blacklist =
+max_age_days = 3  # Only include items from last 3 days
 interval = 60
 ```
 
@@ -247,7 +305,7 @@ interval = 30
 
 ## Dependencies
 
-- **requests**: HTTP requests for API calls
+- **requests**: HTTP requests for API calls and RSS feeds
 - **selenium**: Web browser automation
 - **webdriver-manager**: GeckoDriver management
 - **beautifulsoup4**: HTML parsing and manipulation
