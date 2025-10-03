@@ -9,13 +9,14 @@ class HackerNewsPasture(Pasture):
     def fetch_posts(self) -> List[Dict[str, Any]]:
         """Fetch top stories from Hacker News API."""
         try:
-            # Get top story IDs
+            # Get top story IDs from the correct API endpoint
+            # Use configured URL if provided, otherwise use default HackerNews API
             top_stories_url = self.config.get(
                 "url", "https://hacker-news.firebaseio.com/v0/topstories.json"
             )
             response = requests.get(top_stories_url)
             response.raise_for_status()
-            story_ids = response.json()[:30]  # Get top 30 stories
+            story_ids = response.json()[:50]  # Get top 50 stories
 
             # Fetch story details for each ID
             posts = []
@@ -26,8 +27,8 @@ class HackerNewsPasture(Pasture):
                 story_response = requests.get(story_url)
                 if story_response.status_code == 200:
                     story_data = story_response.json()
-                    # Only include stories with URLs (not Ask HN posts)
-                    if story_data.get("url"):
+                    # Only include stories with URLs (not Ask HN posts or job posts)
+                    if story_data.get("type") == "story" and story_data.get("url"):
                         posts.append(story_data)
 
             return posts

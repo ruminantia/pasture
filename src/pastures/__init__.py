@@ -54,7 +54,11 @@ class PastureFactory:
 
         if "reddit.com" in url:
             return "reddit"
-        elif "hackernews" in url or "news.ycombinator.com" in url:
+        elif (
+            "hackernews" in url
+            or "news.ycombinator.com" in url
+            or "hacker-news.firebaseio.com" in url
+        ):
             return "hackernews"
         # Add more auto-detection patterns as needed
 

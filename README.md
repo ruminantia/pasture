@@ -36,7 +36,7 @@ remove_tags = script, style, noscript, iframe, button, svg, footer, nav
 
 # Pasture configuration examples
 # Each pasture section represents a source to scrape
-# Supported types: reddit, hackernews (future), etc.
+# Supported types: reddit, hackernews, etc.
 
 [worldnews]
 # Reddit pasture (auto-detected from URL)
@@ -60,12 +60,13 @@ url = https://www.reddit.com/r/LocalLLaMA.json
 blacklist =
 interval = 120
 
-# Example HackerNews pasture (commented out for future use)
-# [hackernews_top]
-# type = hackernews
+# HackerNews pasture (working implementation)
+[hackernews_top]
+type = hackernews
+# URL is optional for HackerNews - uses default API if not provided
 # url = https://hacker-news.firebaseio.com/v0/topstories.json
-# blacklist = cryptocurrency, bitcoin, ethereum
-# interval = 60
+blacklist = cryptocurrency, bitcoin, ethereum
+interval = 60
 
 # Example custom pasture (commented out for future use)
 # [tech_blog]
@@ -78,7 +79,7 @@ interval = 120
 ### Configuration Options
 - **Section Name**: Arbitrary identifier for the pasture
 - **type**: Pasture type (reddit, hackernews, etc.) - auto-detected if not specified
-- **url**: The source URL or API endpoint
+- **url**: The source URL or API endpoint (optional for HackerNews)
 - **blacklist**: Comma-separated list of terms to exclude (case-insensitive)
 - **remove_tags**: Comma-separated list of HTML tags to remove during processing
 - **interval**: Scraping interval in minutes (optional, defaults to 60 minutes)
@@ -221,8 +222,28 @@ class PastureFactory:
 
 ### HackerNews Pasture
 - **Type**: `hackernews`
-- **URL Format**: Hacker News API endpoints
-- **Features**: Fetches top stories and filters based on title blacklist
+- **URL Format**: Hacker News API endpoints (e.g., `https://hacker-news.firebaseio.com/v0/topstories.json`)
+- **Features**: Fetches top 50 stories, filters based on title blacklist, excludes Ask HN and job posts
+- **Note**: URL is optional - HackerNews pasture uses default API endpoints if not provided
+
+## Configuration Examples
+
+### HackerNews Pasture
+```ini
+[hackernews_top]
+type = hackernews
+# url = https://hacker-news.firebaseio.com/v0/topstories.json  # Optional
+blacklist = cryptocurrency, bitcoin, ethereum
+interval = 60
+```
+
+### Reddit Pasture (Auto-detected)
+```ini
+[worldnews]
+url = https://www.reddit.com/r/worldnews.json
+blacklist = politics, election
+interval = 30
+```
 
 ## Dependencies
 
