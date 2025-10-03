@@ -207,7 +207,7 @@ remove_tags = -nav, -footer
 
 ### Setting Up Development Environment
 ```bash
-git clone <repository-url>
+git clone https://github.com/ruminantia/pasture.git
 cd pasture
 python -m venv venv
 source venv/bin/activate
