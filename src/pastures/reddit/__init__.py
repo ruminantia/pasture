@@ -12,9 +12,11 @@ class RedditPasture(Pasture):
         try:
             response = requests.get(url, headers={"User-agent": "your bot 0.1"})
             response.raise_for_status()
-            return response.json()["data"]["children"]
+            posts = response.json()["data"]["children"]
+            print(f"📥 Fetched {len(posts)} posts")
+            return posts
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching {url}: {e}")
+            print(f"❌ Error fetching: {e}")
             return []
 
     def filter_posts(self, posts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -36,6 +38,9 @@ class RedditPasture(Pasture):
                 )
             ):
                 filtered_posts.append(post)
+
+        if blacklist and len(posts) > len(filtered_posts):
+            print(f"🎯 Filtered {len(posts) - len(filtered_posts)} posts")
         return filtered_posts
 
     def get_url_from_post(self, post: Dict[str, Any]) -> str:

@@ -17,8 +17,7 @@ from selenium.common.exceptions import WebDriverException
 from webdriver_manager.firefox import GeckoDriverManager
 
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up logging - use centralized configuration from main
 logger = logging.getLogger(__name__)
 
 
@@ -37,17 +36,17 @@ class CachedGeckoDriverManager:
             # Try to use cached driver first
             cached_path = self._get_cached_driver()
             if cached_path:
-                logger.info("Using cached GeckoDriver")
+                logger.info("📦 Using cached GeckoDriver")
                 return str(cached_path)
 
             # If no cache, download and cache it
-            logger.info("Downloading GeckoDriver (this may hit GitHub API limits)")
+            logger.info("⬇️  Downloading GeckoDriver")
             driver_path = self.manager.install()
             self._cache_driver(driver_path)
             return driver_path
 
         except Exception as e:
-            logger.warning(f"Failed to use webdriver-manager: {e}")
+            logger.warning(f"⚠️  Driver download failed: {e}")
             # Fallback to system Firefox
             return self._fallback_to_system_firefox()
 
@@ -77,7 +76,7 @@ class CachedGeckoDriverManager:
 
     def _fallback_to_system_firefox(self) -> str:
         """Fallback to using system Firefox binary."""
-        logger.info("Falling back to system Firefox")
+        logger.info("🦊 Falling back to system Firefox")
         # Check for common Firefox binary locations
         firefox_paths = [
             "/usr/bin/firefox-bin",  # Your system path
@@ -89,7 +88,7 @@ class CachedGeckoDriverManager:
 
         for path in firefox_paths:
             if os.path.exists(path):
-                logger.info(f"Found Firefox at: {path}")
+                logger.info(f"✅ Found Firefox at: {path}")
                 return "geckodriver"  # This tells Selenium to use system binary
 
         # Try to find Firefox using which command
@@ -102,12 +101,12 @@ class CachedGeckoDriverManager:
             if result.returncode == 0:
                 firefox_path = result.stdout.strip()
                 if os.path.exists(firefox_path):
-                    logger.info(f"Found Firefox via PATH: {firefox_path}")
+                    logger.info(f"✅ Found Firefox via PATH: {firefox_path}")
                     return "geckodriver"
         except Exception as e:
-            logger.warning(f"Error finding Firefox via which: {e}")
+            logger.warning(f"⚠️  Error finding Firefox: {e}")
 
-        logger.warning("No Firefox binary found in common locations")
+        logger.warning("⚠️  No Firefox binary found")
         return "geckodriver"  # Still try system binary as last resort
 
 
@@ -246,13 +245,14 @@ def hash_url(url: str) -> str:
 
 
 def post_process_html(file_path: str, tags_to_remove: List[str]) -> None:
-    """Cleans up an HTML file using BeautifulSoup and converts it to Markdown.
+    """Post-process an HTML file using BeautifulSoup and converts it to Markdown.
 
     Args:
         file_path: Path to the HTML file
         tags_to_remove: List of HTML tag names to remove
     """
-    logger.info(f"Post-processing {file_path}")
+    filename = os.path.basename(file_path)
+    logger.info(f"🔄 Processing {filename}")
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             soup = BeautifulSoup(f, "html.parser")
@@ -297,13 +297,13 @@ def post_process_html(file_path: str, tags_to_remove: List[str]) -> None:
         # Remove the original HTML file
         os.remove(file_path)
 
-        logger.info(f"Finished post-processing {file_path}")
+        logger.info(f"✅ Processed {filename}")
 
     except Exception as e:
-        logger.error(f"Error post-processing {file_path}: {e}")
+        logger.error(f"❌ Failed to process {filename}: {e}")
         # Keep the original HTML file if processing fails
         if os.path.exists(file_path):
-            logger.info(f"Keeping original HTML file: {file_path}")
+            logger.info(f"📁 Keeping original HTML file")
 
 
 def create_driver_with_retry(max_retries: int = 3) -> webdriver.Firefox:
@@ -341,7 +341,7 @@ def create_driver_with_retry(max_retries: int = 3) -> webdriver.Firefox:
 
             for firefox_path in firefox_paths:
                 if os.path.exists(firefox_path):
-                    logger.info(f"Using Firefox binary: {firefox_path}")
+                    logger.info(f"🦊 Using Firefox: {firefox_path}")
                     options.binary_location = firefox_path
                     break
 
@@ -356,7 +356,7 @@ def create_driver_with_retry(max_retries: int = 3) -> webdriver.Firefox:
                     if result.returncode == 0:
                         firefox_path = result.stdout.strip()
                         if os.path.exists(firefox_path):
-                            logger.info(f"Using Firefox from PATH: {firefox_path}")
+                            logger.info(f"🦊 Using Firefox from PATH")
                             options.binary_location = firefox_path
                 except Exception:
                     pass
@@ -372,13 +372,13 @@ def create_driver_with_retry(max_retries: int = 3) -> webdriver.Firefox:
             return driver
 
         except Exception as e:
-            logger.warning(f"Attempt {attempt + 1} failed to create driver: {e}")
+            logger.warning(f"⚠️  Driver attempt {attempt + 1} failed: {e}")
             if attempt < max_retries - 1:
                 wait_time = 2**attempt  # Exponential backoff
-                logger.info(f"Retrying in {wait_time} seconds...")
+                logger.info(f"⏳ Retrying in {wait_time}s...")
                 time.sleep(wait_time)
             else:
-                logger.error("All attempts to create driver failed")
+                logger.error("❌ All driver attempts failed")
                 raise WebDriverException(
                     f"Failed to create Firefox driver after {max_retries} attempts: {e}"
                 )
@@ -397,11 +397,11 @@ def scrape_url(url: str, output_dir: str, tags_to_remove: List[str]) -> bool:
     """
     # Skip media URLs that don't contain HTML content
     if is_media_url(url):
-        logger.info(f"Skipping media URL: {url}")
+        logger.info(f"📷 Skipping media: {url}")
         return False
     driver = None
     try:
-        logger.info(f"Scraping {url}")
+        logger.info(f"🌐 Scraping: {url}")
         driver = create_driver_with_retry()
 
         # Set reasonable timeouts
@@ -420,17 +420,17 @@ def scrape_url(url: str, output_dir: str, tags_to_remove: List[str]) -> bool:
             f.write(html)
 
         post_process_html(file_path, tags_to_remove)
-        logger.info(f"Successfully scraped {url}")
+        logger.info(f"✅ Scraped: {url}")
         return True
 
     except Exception as e:
-        logger.error(f"Error scraping {url}: {e}")
+        logger.error(f"❌ Failed to scrape: {url}")
         # Try fallback for timeout, DNS, or driver issues
         if any(
             error_type in str(e).lower()
             for error_type in ["timeout", "dns", "driver", "firefox", "navigation"]
         ):
-            logger.info("Attempting fallback scraping method")
+            logger.info("🔄 Attempting fallback method")
             return fallback_scrape_url(url, output_dir, tags_to_remove)
         return False
 
@@ -439,7 +439,7 @@ def scrape_url(url: str, output_dir: str, tags_to_remove: List[str]) -> bool:
             try:
                 driver.quit()
             except Exception as e:
-                logger.warning(f"Error closing driver: {e}")
+                logger.warning(f"⚠️  Error closing driver: {e}")
 
 
 def load_processed_urls(processed_urls_file: str) -> Set[str]:
@@ -456,7 +456,7 @@ def load_processed_urls(processed_urls_file: str) -> Set[str]:
             with open(processed_urls_file, "r") as f:
                 return set(json.load(f))
         except Exception as e:
-            logger.warning(f"Error loading processed URLs: {e}")
+            logger.warning(f"⚠️  Error loading processed URLs: {e}")
             return set()
     else:
         return set()
@@ -473,7 +473,7 @@ def save_processed_urls(processed_urls_file: str, processed_urls: Set[str]) -> N
         with open(processed_urls_file, "w") as f:
             json.dump(list(processed_urls), f)
     except Exception as e:
-        logger.error(f"Error saving processed URLs: {e}")
+        logger.error(f"❌ Error saving processed URLs: {e}")
 
 
 def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str]) -> Set[str]:
@@ -500,7 +500,7 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str]) -> S
 
             # Skip media URLs early to avoid unnecessary processing
             if is_media_url(external_url):
-                logger.info(f"Skipping media URL: {external_url}")
+                logger.info(f"📷 Skipping media: {external_url}")
                 continue
 
             if pasture.should_scrape_url(external_url, processed_urls):
@@ -508,15 +508,15 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str]) -> S
                     pasture.mark_url_processed(external_url, processed_urls)
                     new_urls_scraped += 1
                 else:
-                    logger.warning(f"Failed to scrape {external_url}")
+                    logger.warning(f"❌ Failed: {external_url}")
             else:
-                logger.info(f"Skipping duplicate URL: {external_url}")
+                logger.info(f"⏭️  Skipping duplicate: {external_url}")
 
-        logger.info(f"Scraped {new_urls_scraped} new URLs from {pasture.name}")
+        logger.info(f"📊 {pasture.name}: {new_urls_scraped} new URLs")
         return processed_urls
 
     except Exception as e:
-        logger.error(f"Error scraping pasture {pasture.name}: {e}")
+        logger.error(f"❌ Error in {pasture.name}: {e}")
         return processed_urls
 
 
@@ -553,7 +553,7 @@ def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str]) ->
     This is used when Selenium fails due to driver issues.
     """
     try:
-        logger.info(f"Attempting fallback scrape for {url}")
+        logger.info(f"🔄 Fallback scraping: {url}")
 
         # Skip media URLs in fallback too
         if is_media_url(url):
@@ -585,9 +585,9 @@ def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str]) ->
 
         # Process the HTML
         post_process_html(file_path, tags_to_remove)
-        logger.info(f"Successfully fallback-scraped {url}")
+        logger.info(f"✅ Fallback scraped: {url}")
         return True
 
     except Exception as e:
-        logger.error(f"Fallback scraping failed for {url}: {e}")
+        logger.error(f"❌ Fallback failed: {url}")
         return False

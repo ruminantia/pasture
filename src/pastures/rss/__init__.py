@@ -54,10 +54,10 @@ class RSSPasture(Pasture):
             return posts
 
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching RSS feed {url}: {e}")
+            print(f"❌ Error fetching RSS feed: {e}")
             return []
         except ET.ParseError as e:
-            print(f"Error parsing RSS feed {url}: {e}")
+            print(f"❌ Error parsing RSS feed: {e}")
             return []
 
     def _parse_rss_item(self, item) -> Dict[str, Any]:
@@ -159,6 +159,11 @@ class RSSPasture(Pasture):
 
             filtered_posts.append(post)
 
+        print(f"📄 Got {len(posts)} RSS items")
+        if blacklist and len(posts) > len(filtered_posts):
+            print(f"🎯 Filtered {len(posts) - len(filtered_posts)} items")
+        if max_age_days and len(posts) > len(filtered_posts):
+            print(f"📅 Age filtered {len(posts) - len(filtered_posts)} items")
         return filtered_posts
 
     def _is_within_age_limit(self, post: Dict[str, Any], max_age_days: int) -> bool:

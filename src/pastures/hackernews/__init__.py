@@ -31,9 +31,10 @@ class HackerNewsPasture(Pasture):
                     if story_data.get("type") == "story" and story_data.get("url"):
                         posts.append(story_data)
 
+            print(f"📄 Got {len(posts)} stories with URLs")
             return posts
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching Hacker News stories: {e}")
+            print(f"❌ Error fetching Hacker News: {e}")
             return []
 
     def filter_posts(self, posts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -51,6 +52,8 @@ class HackerNewsPasture(Pasture):
             if not any(term.lower() in title for term in blacklist):
                 filtered_posts.append(post)
 
+        if blacklist and len(posts) > len(filtered_posts):
+            print(f"🎯 Filtered {len(posts) - len(filtered_posts)} posts")
         return filtered_posts
 
     def get_url_from_post(self, post: Dict[str, Any]) -> str:
