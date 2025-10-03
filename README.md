@@ -4,9 +4,10 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**Pasture is a sophisticated content scraping system that intelligently aggregates and processes content from multiple sources into clean, readable Markdown.** 
+**Pasture** is a sophisticated content scraping and aggregation engine designed to systematically harvest raw web content from a wide array of sources. Its core function is to ingest this diverse and often messy HTML and transform it into a standardized, **rough, LLM-readable Markdown** format. This process involves stripping away non-essential visual clutter like complex navigation, ads, and scripts, while preserving the core textual and structural information—headings, lists, paragraphs, and links—in a way that is optimally structured for machine parsing.
 
-Originally a Reddit-only scraper, Pasture has evolved into a modular platform supporting Reddit, HackerNews, RSS feeds, and custom sources with intelligent duplicate detection and filtering.
+It is crucial to understand that the goal of Pasture is not to generate polished, user-facing Markdown documents. Instead, its purpose is to act as the foundational first step in a larger data pipeline, efficiently gathering a massive corpus of raw, semi-structured web content. This aggregated data serves as the essential raw material for subsequent, more complex LLM pipelines—such as those for pre-training, fine-tuning, or advanced Retrieval-Augmented Generation (RAG) systems. By providing a clean, consistent, and machine-friendly data stream, Pasture enables these downstream processes to focus on higher-level analysis, reasoning, and content generation.
+
 
 ## ✨ Features
 
@@ -182,7 +183,7 @@ class CustomPasture(Pasture):
     def fetch_posts(self) -> List[Dict[str, Any]]:
         # Your fetching logic
         pass
-    
+
     # ... implement other required methods
 ```
 
