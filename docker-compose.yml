@@ -6,7 +6,7 @@ services:
     container_name: ruminantia-pasture
     restart: unless-stopped
     volumes:
-      - pasture-output:/app/output
+      - pastures:/app/output
       - ./config.ini:/app/config.ini:ro
     environment:
       - PYTHONPATH=/app
@@ -28,7 +28,7 @@ services:
       - pasture-network
 
 volumes:
-  pasture-output:
+  pastures:
     driver: local
 
 networks:
