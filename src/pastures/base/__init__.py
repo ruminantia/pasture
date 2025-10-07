@@ -42,7 +42,12 @@ class Pasture(ABC):
         Returns:
             Full path to pasture-specific output directory
         """
-        run_dir = os.path.join(base_output_dir, datetime.now().strftime("%Y-%m-%d"))
+        run_dir = os.path.join(
+            base_output_dir,
+            datetime.now().strftime("%Y"),
+            datetime.now().strftime("%m"),
+            datetime.now().strftime("%d"),
+        )
         pasture_dir = os.path.join(run_dir, self.name)
         os.makedirs(pasture_dir, exist_ok=True)
         return pasture_dir
