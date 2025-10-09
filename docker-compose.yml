@@ -1,5 +1,6 @@
 services:
   pasture-scraper:
+    image: pasture
     build:
       context: .
       dockerfile: Dockerfile
@@ -29,6 +30,7 @@ services:
 
 volumes:
   pastures:
+    name: pastures
     driver: local
 
 networks:
