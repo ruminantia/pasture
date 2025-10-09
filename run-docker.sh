@@ -21,6 +21,7 @@ cd "$SCRIPT_DIR"
 RED='\033[0;31m'      # Error messages
 GREEN='\033[0;32m'    # Success messages
 YELLOW='\033[1;33m'   # Warning messages
+BLUE='\033[0;34m'     # Debug messages
 NC='\033[0m'          # No Color (reset)
 
 # =============================================================================
@@ -360,6 +361,7 @@ case "${1:-}" in
         # Display comprehensive help information
         show_help
         ;;
+
     "")
         # Default behavior: run once and exit (for testing)
         check_config_file

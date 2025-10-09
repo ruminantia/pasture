@@ -1,6 +1,9 @@
+import logging
 import requests
 from typing import List, Dict, Any
 from ..base import Pasture
+
+logger = logging.getLogger(__name__)
 
 
 class RedditPasture(Pasture):
@@ -30,12 +33,18 @@ class RedditPasture(Pasture):
         filtered_posts = []
         for post in posts:
             post_data = post["data"]
+            title = post_data["title"]
+            title_lower = title.lower()
+
+            # Debug: show what we're checking
+            blacklist_matches = [
+                term for term in blacklist if term.lower() in title_lower
+            ]
+
             if (
                 not post_data["stickied"]
                 and not post_data["is_self"]
-                and not any(
-                    term.lower() in post_data["title"].lower() for term in blacklist
-                )
+                and not any(term.lower() in title_lower for term in blacklist)
             ):
                 filtered_posts.append(post)
 
