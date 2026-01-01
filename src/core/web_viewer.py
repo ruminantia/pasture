@@ -325,13 +325,13 @@ def create_index_html(viewer_dir: str) -> None:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pasture Viewer</title>
+    <title>🐄 Pasture</title>
     <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Pasture</h1>
+            <h1>🐄 Pasture</h1>
             <div class="header-controls">
                 <button id="calendar-toggle" aria-label="Toggle calendar">📅</button>
                 <button id="settings-toggle" aria-label="Toggle settings">⚙️</button>
@@ -379,7 +379,7 @@ def create_index_html(viewer_dir: str) -> None:
             <main class="viewer">
                 <div id="article-content">
                     <div class="welcome">
-                        <h2>Welcome to Pasture</h2>
+                        <h2>Welcome to 🐄 Pasture</h2>
                         <p>Select a date from the calendar to browse scraped articles.</p>
                     </div>
                 </div>
@@ -405,7 +405,7 @@ def create_index_html(viewer_dir: str) -> None:
 
         <div class="logs-section">
             <div class="logs-header">
-                <h3>Scraper Logs</h3>
+                <h3>Logs</h3>
                 <div class="logs-controls">
                     <button id="show-log-files">Log Files</button>
                     <button id="refresh-logs">Refresh</button>
@@ -974,7 +974,7 @@ header h1 {
 }
 
 .stat-value {
-    font-size: 24px;
+    font-size: 32px;
     font-weight: bold;
     color: var(--accent);
 }
