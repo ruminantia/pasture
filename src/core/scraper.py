@@ -16,6 +16,8 @@ from selenium.webdriver.firefox.options import Options
 from selenium.common.exceptions import WebDriverException
 from webdriver_manager.firefox import GeckoDriverManager
 
+from core.stats import StatsTracker
+
 
 # Set up logging - use centralized configuration from main
 logger = logging.getLogger(__name__)
@@ -476,19 +478,29 @@ def save_processed_urls(processed_urls_file: str, processed_urls: Set[str]) -> N
         logger.error(f"❌ Error saving processed URLs: {e}")
 
 
-def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str]) -> Set[str]:
+def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stats_tracker: StatsTracker = None) -> Set[str]:
     """Scrape a single pasture.
 
     Args:
         pasture: Pasture instance to scrape
         base_output_dir: Base output directory
         processed_urls: Set of already processed URLs
+        stats_tracker: Optional StatsTracker instance for collecting statistics
 
     Returns:
         Updated set of processed URLs
     """
     try:
+        # Add source to stats
+        if stats_tracker:
+            stats_tracker.add_source(pasture.name)
+
         posts = pasture.fetch_posts()
+
+        # Pass stats tracker to filter_posts so it can track rejections
+        if hasattr(pasture, 'set_stats_tracker'):
+            pasture.set_stats_tracker(stats_tracker)
+
         filtered_posts = pasture.filter_posts(posts)
 
         output_dir = pasture.get_output_directory(base_output_dir)
@@ -507,16 +519,27 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str]) -> S
                 if scrape_url(external_url, output_dir, tags_to_remove):
                     pasture.mark_url_processed(external_url, processed_urls)
                     new_urls_scraped += 1
+                    # Track successful scrape
+                    if stats_tracker:
+                        stats_tracker.increment_scraped(pasture.name)
                 else:
                     logger.warning(f"❌ Failed: {external_url}")
+                    # Track error
+                    if stats_tracker:
+                        stats_tracker.increment_error()
             else:
                 logger.info(f"⏭️  Skipping duplicate: {external_url}")
+                # Track duplicate
+                if stats_tracker:
+                    stats_tracker.increment_duplicate()
 
         logger.info(f"📊 {pasture.name}: {new_urls_scraped} new URLs")
         return processed_urls
 
     except Exception as e:
         logger.error(f"❌ Error in {pasture.name}: {e}")
+        if stats_tracker:
+            stats_tracker.increment_error()
         return processed_urls
 
 

@@ -141,6 +141,9 @@ start_scraper() {
     fi
 
     print_status "Scraper started successfully!"
+    echo ""
+    echo -e "${GREEN}📊 Web Viewer:${NC} http://localhost:8000"
+    echo ""
     echo "To view logs: ./run-docker.sh logs"
     echo "To stop the scraper: ./run-docker.sh stop"
     echo ""
@@ -233,6 +236,9 @@ start_attached() {
     # The terminal will be occupied until the scraper is stopped with Ctrl+C.
     check_config_file
     print_status "Starting Ruminantia Pasture scraper in attached mode..."
+    echo ""
+    echo -e "${GREEN}📊 Web Viewer:${NC} http://localhost:8000"
+    echo ""
     print_warning "Press Ctrl+C to stop the scraper"
     print_warning "Terminal will be occupied until scraper is stopped"
 
@@ -241,6 +247,7 @@ start_attached() {
     else
         docker run -it \
             --rm \
+            -p 8000:8000 \
             -v "$(pwd)/config.ini:/app/config.ini" \
             -v "$(pwd)/output:/app/output" \
             pasture
@@ -291,6 +298,11 @@ show_help() {
     echo ""
     echo "Default Behavior:"
     echo "  If no command is provided, the scraper runs once and exits."
+    echo ""
+    echo "Web Viewer:"
+    echo "  - When the scraper is running, the web viewer is available at http://localhost:8000"
+    echo "  - The viewer provides a calendar-based interface for browsing scraped content"
+    echo "  - The viewer is automatically updated after each scraping run"
     echo ""
     echo "Operational Notes:"
     echo "  - The scraper runs continuously with scheduled scraping intervals"

@@ -168,6 +168,12 @@ output/
 chromedriver*
 geckodriver*
 
+# Claude Code workspace
+.claude/
+
+# Webdriver cache
+.webdriver_cache/
+
 # Browser profiles/cache
 .firefox/
 .chrome/

@@ -146,6 +146,17 @@ class RSSPasture(Pasture):
             title = post.get("title", "").lower()
             description = post.get("description", "").lower()
 
+            # Check for blacklist matches
+            blacklist_matches = [
+                term for term in blacklist
+                if term.lower() in title or term.lower() in description
+            ]
+
+            # Track blacklist rejection
+            if blacklist_matches and self.stats_tracker:
+                for term in blacklist_matches:
+                    self.stats_tracker.increment_blacklisted(term)
+
             # Skip posts that contain blacklisted terms in title or description
             if any(
                 term.lower() in title or term.lower() in description

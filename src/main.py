@@ -13,6 +13,8 @@ from core.scraper import (
     load_processed_urls,
     save_processed_urls,
 )
+from core.stats import StatsTracker
+from core.config_reload import trigger_config_reload, wait_for_reload, clear_reload
 
 
 # Set up logging - centralized configuration to avoid duplicates
@@ -60,6 +62,28 @@ def setup_logging():
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(PastureFormatter())
     root_logger.addHandler(console_handler)
+
+    # Also log to file for web viewer - use daily rotating logs
+    try:
+        from logging.handlers import TimedRotatingFileHandler
+        os.makedirs('output/logs', exist_ok=True)
+
+        # Daily rotating log files in logs/ directory
+        # Current log: output/logs/scraper.log
+        # Rotated logs: output/logs/scraper.log.YYYY-MM-DD
+        file_handler = TimedRotatingFileHandler(
+            'output/logs/scraper.log',
+            when='midnight',
+            interval=1,
+            backupCount=30,  # Keep 30 days of logs
+            encoding='utf-8'
+        )
+        file_handler.suffix = '%Y-%m-%d'
+        file_handler.setFormatter(PastureFormatter())
+        root_logger.addHandler(file_handler)
+    except Exception as e:
+        print(f"Warning: Could not set up file logging: {e}")
+
     root_logger.setLevel(logging.INFO)
 
     # Disable propagation to prevent duplicate messages
@@ -84,6 +108,9 @@ def run_single_scrape(config: configparser.ConfigParser) -> None:
 
     processed_urls_file = os.path.join(output_base_dir, "processed_urls.json")
     processed_urls = load_processed_urls(processed_urls_file)
+
+    # Create stats tracker for this session
+    stats_tracker = StatsTracker(output_base_dir)
 
     logger.info(f"🚀 Starting scrape session")
 
@@ -113,12 +140,23 @@ def run_single_scrape(config: configparser.ConfigParser) -> None:
                         # If only pasture_blacklist exists, it's already set
 
             pasture = PastureFactory.create_pasture(section, pasture_config)
-            processed_urls = scrape_pasture(pasture, output_base_dir, processed_urls)
+            processed_urls = scrape_pasture(pasture, output_base_dir, processed_urls, stats_tracker)
         except Exception as e:
             logger.error(f"Error processing pasture '{section}': {e}")
 
     save_processed_urls(processed_urls_file, processed_urls)
+
+    # Save session statistics
+    stats_tracker.save_session_stats()
+
     logger.info(f"✅ Scrape session completed")
+
+    # Generate web viewer
+    try:
+        from core.web_viewer import generate_static_site
+        generate_static_site(output_base_dir)
+    except Exception as e:
+        logger.error(f"❌ Failed to generate web viewer: {e}")
 
 
 def scrape_scheduled_pasture(section: str, config: configparser.ConfigParser) -> None:
@@ -133,6 +171,9 @@ def scrape_scheduled_pasture(section: str, config: configparser.ConfigParser) ->
 
     processed_urls_file = os.path.join(output_base_dir, "processed_urls.json")
     processed_urls = load_processed_urls(processed_urls_file)
+
+    # Create stats tracker for this session
+    stats_tracker = StatsTracker(output_base_dir)
 
     logger.info(f"⏰ Scheduled scrape: {section}")
 
@@ -156,12 +197,23 @@ def scrape_scheduled_pasture(section: str, config: configparser.ConfigParser) ->
                     # If only pasture_blacklist exists, it's already set
 
         pasture = PastureFactory.create_pasture(section, pasture_config)
-        processed_urls = scrape_pasture(pasture, output_base_dir, processed_urls)
+        processed_urls = scrape_pasture(pasture, output_base_dir, processed_urls, stats_tracker)
     except Exception as e:
         logger.error(f"Error processing pasture '{section}': {e}")
 
     save_processed_urls(processed_urls_file, processed_urls)
+
+    # Save session statistics
+    stats_tracker.save_session_stats()
+
     logger.info(f"✅ Scheduled scrape completed: {section}")
+
+    # Generate web viewer
+    try:
+        from core.web_viewer import generate_static_site
+        generate_static_site(output_base_dir)
+    except Exception as e:
+        logger.error(f"❌ Failed to generate web viewer: {e}")
 
 
 def setup_scheduler(config: configparser.ConfigParser) -> None:
@@ -192,6 +244,92 @@ def setup_scheduler(config: configparser.ConfigParser) -> None:
             )
 
 
+def clear_scheduler() -> None:
+    """Clear all scheduled jobs."""
+    schedule.clear()
+    logger.info("🧹 Cleared all scheduled jobs")
+
+
+def reload_config_and_reschedule(old_config: configparser.ConfigParser = None) -> configparser.ConfigParser:
+    """Reload configuration and reschedule all pastures.
+
+    Args:
+        old_config: Previous configuration (optional, for detecting new/modified pastures)
+
+    Returns:
+        Updated configuration parser
+    """
+    logger.info("🔄 Reloading configuration...")
+
+    # Store old pasture configs for comparison
+    old_pastures = {}
+    if old_config:
+        for section in old_config.sections():
+            if section != "global":
+                old_pastures[section] = dict(old_config[section])
+
+    # Reload config file
+    config = configparser.ConfigParser()
+    config.read("config.ini")
+
+    # Clear existing schedule
+    clear_scheduler()
+
+    # Setup new schedule
+    setup_scheduler(config)
+
+    # List all active scheduled jobs
+    jobs = schedule.get_jobs()
+    logger.info(f"📅 Active scheduled jobs: {len(jobs)}")
+    for job in jobs:
+        if hasattr(job, 'tags') and job.tags:
+            logger.info(f"   - {job.tags}")
+
+    # Determine which pastures are new or modified
+    new_or_modified = []
+    for section in config.sections():
+        if section == "global":
+            continue
+
+        if section not in old_pastures:
+            # New pasture
+            new_or_modified.append((section, "new"))
+            logger.info(f"➕ New pasture detected: {section}")
+        else:
+            # Check if modified
+            old_cfg = old_pastures[section]
+            new_cfg = dict(config[section])
+
+            # Compare configs (ignore interval for modification detection since
+            # interval changes don't require immediate scrape)
+            is_modified = False
+            for key, new_value in new_cfg.items():
+                if key == "interval":
+                    continue
+                old_value = old_cfg.get(key)
+                if old_value != new_value:
+                    is_modified = True
+                    break
+
+            if is_modified:
+                new_or_modified.append((section, "modified"))
+                logger.info(f"✏️  Modified pasture detected: {section}")
+
+    # Trigger immediate scrape for new or modified pastures
+    if new_or_modified:
+        logger.info(f"🚀 Immediately scraping {len(new_or_modified)} new/modified pasture(s)...")
+        for section, reason in new_or_modified:
+            logger.info(f"   - Scraping {section} ({reason})")
+            try:
+                scrape_scheduled_pasture(section, config)
+            except Exception as e:
+                logger.error(f"❌ Failed to scrape {section}: {e}")
+    else:
+        logger.info("ℹ️  No new or modified pastures - skipping immediate scrape")
+
+    return config
+
+
 def should_run_scheduled_mode(config: configparser.ConfigParser) -> bool:
     """Check if we should run in scheduled mode.
 
@@ -213,6 +351,14 @@ def main() -> None:
     config = configparser.ConfigParser()
     config.read("config.ini")
 
+    # Start HTTP server for web viewer
+    try:
+        from core.web_viewer import start_http_server
+        output_base_dir = "output"
+        start_http_server(output_base_dir, port=8000)
+    except Exception as e:
+        logger.error(f"❌ Failed to start web viewer HTTP server: {e}")
+
     if should_run_scheduled_mode(config):
         # Run initial scrape
         run_single_scrape(config)
@@ -223,6 +369,13 @@ def main() -> None:
         logger.info("🔄 Scheduler started - Press Ctrl+C to exit")
         try:
             while True:
+                # Check for config reload event
+                if wait_for_reload(timeout=0.1):  # Non-blocking check
+                    logger.info("🔄 Config reload requested, rescheduling...")
+                    clear_reload()
+                    # Pass old config for comparison
+                    config = reload_config_and_reschedule(old_config=config)
+
                 schedule.run_pending()
                 time.sleep(1)
         except KeyboardInterrupt:

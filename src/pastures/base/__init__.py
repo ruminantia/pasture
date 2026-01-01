@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Set, Optional
 import os
 from datetime import datetime
 
@@ -11,6 +11,15 @@ class Pasture(ABC):
         self.name = name
         self.config = config
         self.processed_urls: Set[str] = set()
+        self.stats_tracker: Optional[Any] = None  # Optional StatsTracker instance
+
+    def set_stats_tracker(self, stats_tracker: Optional[Any]) -> None:
+        """Set the stats tracker for this pasture.
+
+        Args:
+            stats_tracker: StatsTracker instance to use for tracking statistics
+        """
+        self.stats_tracker = stats_tracker
 
     @abstractmethod
     def fetch_posts(self) -> List[Dict[str, Any]]:
@@ -42,15 +51,15 @@ class Pasture(ABC):
         Returns:
             Full path to pasture-specific output directory
         """
+        pasture_dir = os.path.join(base_output_dir, self.name)
         run_dir = os.path.join(
-            base_output_dir,
+            pasture_dir,
             datetime.now().strftime("%Y"),
             datetime.now().strftime("%m"),
             datetime.now().strftime("%d"),
         )
-        pasture_dir = os.path.join(run_dir, self.name)
-        os.makedirs(pasture_dir, exist_ok=True)
-        return pasture_dir
+        os.makedirs(run_dir, exist_ok=True)
+        return run_dir
 
     def should_scrape_url(self, url: str, processed_urls: Set[str]) -> bool:
         """Check if a URL should be scraped.

@@ -36,10 +36,15 @@ class RedditPasture(Pasture):
             title = post_data["title"]
             title_lower = title.lower()
 
-            # Debug: show what we're checking
+            # Check for blacklist matches
             blacklist_matches = [
                 term for term in blacklist if term.lower() in title_lower
             ]
+
+            # Track blacklist rejection
+            if blacklist_matches and self.stats_tracker:
+                for term in blacklist_matches:
+                    self.stats_tracker.increment_blacklisted(term)
 
             if (
                 not post_data["stickied"]
