@@ -128,11 +128,7 @@ class RSSPasture(Pasture):
 
     def filter_posts(self, posts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Filter RSS items based on criteria."""
-        blacklist = [
-            term.strip()
-            for term in self.config.get("blacklist", "").split(",")
-            if term.strip()
-        ]
+        blacklist = self.get_blacklist()
 
         max_age_days = self.config.get("max_age_days")
         if max_age_days:

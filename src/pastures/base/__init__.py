@@ -140,6 +140,42 @@ class Pasture(ABC):
 
         return all_tags_to_remove
 
+    def get_blacklist(self) -> List[str]:
+        """Get the combined blacklist of terms to filter out.
+
+        Returns:
+            List of blacklist terms (global + pasture-specific)
+        """
+        blacklist_terms = []
+
+        # Get global blacklist if available
+        if "global" in self.config and "blacklist" in self.config["global"]:
+            global_blacklist = [
+                term.strip()
+                for term in self.config["global"]["blacklist"].split(",")
+                if term.strip()
+            ]
+            blacklist_terms.extend(global_blacklist)
+
+        # Get pasture-specific blacklist
+        if "blacklist" in self.config:
+            pasture_blacklist = [
+                term.strip()
+                for term in self.config["blacklist"].split(",")
+                if term.strip()
+            ]
+            blacklist_terms.extend(pasture_blacklist)
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_blacklist = []
+        for term in blacklist_terms:
+            if term.lower() not in seen:
+                seen.add(term.lower())
+                unique_blacklist.append(term)
+
+        return unique_blacklist
+
     @abstractmethod
     def get_url_from_post(self, post: Dict[str, Any]) -> str:
         """Extract the external URL from a post/item.

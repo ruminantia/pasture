@@ -39,11 +39,7 @@ class HackerNewsPasture(Pasture):
 
     def filter_posts(self, posts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Filter Hacker News stories based on criteria."""
-        blacklist = [
-            term.strip()
-            for term in self.config.get("blacklist", "").split(",")
-            if term.strip()
-        ]
+        blacklist = self.get_blacklist()
 
         filtered_posts = []
         for post in posts:
