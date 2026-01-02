@@ -119,25 +119,12 @@ def run_single_scrape(config: configparser.ConfigParser) -> None:
             continue
 
         try:
-            # Merge global configuration with pasture-specific configuration
+            # Create pasture config
             pasture_config = dict(config[section])
+
+            # Include global config in pasture_config so get_blacklist() can access it
             if "global" in config:
-                global_config = dict(config["global"])
-                # Merge global config into pasture config (pasture-specific takes precedence)
-                for key, value in global_config.items():
-                    if key not in pasture_config:
-                        pasture_config[key] = value
-                    elif key == "blacklist":
-                        # For blacklist, combine global and pasture-specific lists
-                        global_blacklist = value.strip()
-                        pasture_blacklist = pasture_config[key].strip()
-                        if global_blacklist and pasture_blacklist:
-                            pasture_config[key] = (
-                                f"{global_blacklist},{pasture_blacklist}"
-                            )
-                        elif global_blacklist:
-                            pasture_config[key] = global_blacklist
-                        # If only pasture_blacklist exists, it's already set
+                pasture_config["global"] = dict(config["global"])
 
             pasture = PastureFactory.create_pasture(section, pasture_config)
             processed_urls = scrape_pasture(pasture, output_base_dir, processed_urls, stats_tracker)
@@ -178,23 +165,12 @@ def scrape_scheduled_pasture(section: str, config: configparser.ConfigParser) ->
     logger.info(f"⏰ Scheduled scrape: {section}")
 
     try:
-        # Merge global configuration with pasture-specific configuration
+        # Create pasture config
         pasture_config = dict(config[section])
+
+        # Include global config in pasture_config so get_blacklist() can access it
         if "global" in config:
-            global_config = dict(config["global"])
-            # Merge global config into pasture config (pasture-specific takes precedence)
-            for key, value in global_config.items():
-                if key not in pasture_config:
-                    pasture_config[key] = value
-                elif key == "blacklist":
-                    # For blacklist, combine global and pasture-specific lists
-                    global_blacklist = value.strip()
-                    pasture_blacklist = pasture_config[key].strip()
-                    if global_blacklist and pasture_blacklist:
-                        pasture_config[key] = f"{global_blacklist},{pasture_blacklist}"
-                    elif global_blacklist:
-                        pasture_config[key] = global_blacklist
-                    # If only pasture_blacklist exists, it's already set
+            pasture_config["global"] = dict(config["global"])
 
         pasture = PastureFactory.create_pasture(section, pasture_config)
         processed_urls = scrape_pasture(pasture, output_base_dir, processed_urls, stats_tracker)

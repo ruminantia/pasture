@@ -246,12 +246,13 @@ def hash_url(url: str) -> str:
     return hashlib.sha256(normalized_url.encode("utf-8")).hexdigest()
 
 
-def post_process_html(file_path: str, tags_to_remove: List[str]) -> None:
+def post_process_html(file_path: str, tags_to_remove: List[str], blacklist: List[str] = None) -> None:
     """Post-process an HTML file using BeautifulSoup and converts it to Markdown.
 
     Args:
         file_path: Path to the HTML file
         tags_to_remove: List of HTML tag names to remove
+        blacklist: Optional list of blacklist terms to check against scraped content
     """
     filename = os.path.basename(file_path)
     logger.info(f"🔄 Processing {filename}")
@@ -295,6 +296,22 @@ def post_process_html(file_path: str, tags_to_remove: List[str]) -> None:
         md_file_path = os.path.splitext(file_path)[0] + ".md"
         with open(md_file_path, "w", encoding="utf-8") as f:
             f.write(markdown_content)
+
+        # Post-scrape blacklist check on the actual content
+        if blacklist:
+            # Get the first line (title) from the markdown
+            with open(md_file_path, "r", encoding="utf-8") as f:
+                first_line = f.readline().strip()
+
+            # Check if the title matches any blacklist terms
+            title_lower = first_line.lower()
+            blacklist_matches = [term for term in blacklist if term.lower() in title_lower]
+
+            if blacklist_matches:
+                logger.info(f"🚫 Post-scrape blacklist match: '{first_line[:60]}...' matched terms: {blacklist_matches}")
+                os.remove(md_file_path)
+                logger.info(f"🗑️  Deleted {os.path.basename(md_file_path)} due to blacklist match")
+                return  # Skip the rest of processing
 
         # Remove the original HTML file
         os.remove(file_path)
@@ -386,13 +403,14 @@ def create_driver_with_retry(max_retries: int = 3) -> webdriver.Firefox:
                 )
 
 
-def scrape_url(url: str, output_dir: str, tags_to_remove: List[str]) -> bool:
+def scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: List[str] = None) -> bool:
     """Scrapes the content of a URL using Selenium.
 
     Args:
         url: URL to scrape
         output_dir: Directory to save the scraped content
         tags_to_remove: List of HTML tags to remove during processing
+        blacklist: Optional list of blacklist terms to check against scraped content
 
     Returns:
         True if scraping was successful, False otherwise
@@ -421,7 +439,7 @@ def scrape_url(url: str, output_dir: str, tags_to_remove: List[str]) -> bool:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(html)
 
-        post_process_html(file_path, tags_to_remove)
+        post_process_html(file_path, tags_to_remove, blacklist)
         logger.info(f"✅ Scraped: {url}")
         return True
 
@@ -505,6 +523,7 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stat
 
         output_dir = pasture.get_output_directory(base_output_dir)
         tags_to_remove = pasture.get_tags_to_remove()
+        blacklist = pasture.get_blacklist()
 
         new_urls_scraped = 0
         for post in filtered_posts:
@@ -516,7 +535,7 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stat
                 continue
 
             if pasture.should_scrape_url(external_url, processed_urls):
-                if scrape_url(external_url, output_dir, tags_to_remove):
+                if scrape_url(external_url, output_dir, tags_to_remove, blacklist):
                     pasture.mark_url_processed(external_url, processed_urls)
                     new_urls_scraped += 1
                     # Track successful scrape
@@ -524,9 +543,13 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stat
                         stats_tracker.increment_scraped(pasture.name)
                 else:
                     logger.warning(f"❌ Failed: {external_url}")
-                    # Track error
-                    if stats_tracker:
-                        stats_tracker.increment_error()
+                    # Try fallback method
+                    if fallback_scrape_url(external_url, output_dir, tags_to_remove, blacklist):
+                        pasture.mark_url_processed(external_url, processed_urls)
+                        new_urls_scraped += 1
+                        # Track successful scrape
+                        if stats_tracker:
+                            stats_tracker.increment_scraped(pasture.name)
             else:
                 logger.info(f"⏭️  Skipping duplicate: {external_url}")
                 # Track duplicate
@@ -570,8 +593,17 @@ def is_media_url(url: str) -> bool:
     return False
 
 
-def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str]) -> bool:
+def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: List[str] = None) -> bool:
     """Fallback scraping method using requests + BeautifulSoup for simple sites.
+
+    Args:
+        url: URL to scrape
+        output_dir: Directory to save the scraped content
+        tags_to_remove: List of HTML tags to remove during processing
+        blacklist: Optional list of blacklist terms to check against scraped content
+
+    Returns:
+        True if scraping was successful, False otherwise
 
     This is used when Selenium fails due to driver issues.
     """
@@ -607,7 +639,7 @@ def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str]) ->
             f.write(response.text)
 
         # Process the HTML
-        post_process_html(file_path, tags_to_remove)
+        post_process_html(file_path, tags_to_remove, blacklist)
         logger.info(f"✅ Fallback scraped: {url}")
         return True
 

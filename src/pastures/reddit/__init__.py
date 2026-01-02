@@ -30,11 +30,14 @@ class RedditPasture(Pasture):
         for post in posts:
             post_data = post["data"]
             title = post_data["title"]
+            url = post_data["url"]
             title_lower = title.lower()
+            url_lower = url.lower()
 
-            # Check for blacklist matches
+            # Check for blacklist matches in both title and URL
             blacklist_matches = [
-                term for term in blacklist if term.lower() in title_lower
+                term for term in blacklist
+                if term.lower() in title_lower or term.lower() in url_lower
             ]
 
             # Track blacklist rejection
@@ -45,7 +48,7 @@ class RedditPasture(Pasture):
             if (
                 not post_data["stickied"]
                 and not post_data["is_self"]
-                and not any(term.lower() in title_lower for term in blacklist)
+                and not any(term.lower() in title_lower or term.lower() in url_lower for term in blacklist)
             ):
                 filtered_posts.append(post)
 

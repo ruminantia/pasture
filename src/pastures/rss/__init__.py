@@ -141,11 +141,12 @@ class RSSPasture(Pasture):
         for post in posts:
             title = post.get("title", "").lower()
             description = post.get("description", "").lower()
+            url = post.get("link", "").lower()
 
-            # Check for blacklist matches
+            # Check for blacklist matches in title, description, and URL
             blacklist_matches = [
                 term for term in blacklist
-                if term.lower() in title or term.lower() in description
+                if term.lower() in title or term.lower() in description or term.lower() in url
             ]
 
             # Track blacklist rejection
@@ -153,9 +154,9 @@ class RSSPasture(Pasture):
                 for term in blacklist_matches:
                     self.stats_tracker.increment_blacklisted(term)
 
-            # Skip posts that contain blacklisted terms in title or description
+            # Skip posts that contain blacklisted terms in title, description, or URL
             if any(
-                term.lower() in title or term.lower() in description
+                term.lower() in title or term.lower() in description or term.lower() in url
                 for term in blacklist
             ):
                 continue

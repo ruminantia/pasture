@@ -44,10 +44,12 @@ class HackerNewsPasture(Pasture):
         filtered_posts = []
         for post in posts:
             title = post.get("title", "").lower()
+            url = post.get("url", "").lower()
 
-            # Check for blacklist matches
+            # Check for blacklist matches in both title and URL
             blacklist_matches = [
-                term for term in blacklist if term.lower() in title
+                term for term in blacklist
+                if term.lower() in title or term.lower() in url
             ]
 
             # Track blacklist rejection
@@ -55,8 +57,8 @@ class HackerNewsPasture(Pasture):
                 for term in blacklist_matches:
                     self.stats_tracker.increment_blacklisted(term)
 
-            # Skip posts that contain blacklisted terms in title
-            if not any(term.lower() in title for term in blacklist):
+            # Skip posts that contain blacklisted terms in title or URL
+            if not any(term.lower() in title or term.lower() in url for term in blacklist):
                 filtered_posts.append(post)
 
         if blacklist and len(posts) > len(filtered_posts):
