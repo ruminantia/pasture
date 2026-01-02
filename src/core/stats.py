@@ -3,9 +3,9 @@
 import os
 import json
 import logging
-from datetime import datetime
 from typing import Dict, Any
 from collections import defaultdict
+from core.datetime_utils import now, format_datetime, get_date_string
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class StatsTracker:
         self.output_dir = output_dir
         self.stats_file = os.path.join(output_dir, 'stats.json')
         self.session_stats = {
-            'start_time': datetime.now().isoformat(),
+            'start_time': format_datetime(now()),
             'articles_scraped': 0,
             'articles_skipped_duplicate': 0,
             'articles_rejected_blacklist': 0,
@@ -57,8 +57,9 @@ class StatsTracker:
             all_stats = self._load_stats()
 
             # Add current session
-            session_date = datetime.now().strftime('%Y-%m-%d')
-            session_time = datetime.now().strftime('%H:%M:%S')
+            dt_now = now()
+            session_date = get_date_string()
+            session_time = dt_now.strftime('%H:%M:%S')
 
             if 'sessions' not in all_stats:
                 all_stats['sessions'] = []
@@ -71,7 +72,7 @@ class StatsTracker:
                 'date': session_date,
                 'time': session_time,
                 'start_time': self.session_stats['start_time'],
-                'end_time': datetime.now().isoformat(),
+                'end_time': format_datetime(dt_now),
                 'articles_scraped': self.session_stats['articles_scraped'],
                 'articles_skipped_duplicate': self.session_stats['articles_skipped_duplicate'],
                 'articles_rejected_blacklist': self.session_stats['articles_rejected_blacklist'],

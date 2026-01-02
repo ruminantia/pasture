@@ -15,6 +15,7 @@ from typing import Dict, List, Any
 from pathlib import Path
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from functools import partial
+from core.datetime_utils import now, format_datetime, get_date_string
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ def scan_scraped_content(output_base_dir: str) -> Dict[str, Any]:
         Dictionary with dates, sources, and article metadata
     """
     content_data = {
-        "generated_at": datetime.now().isoformat() + "Z",
+        "generated_at": format_datetime(now()),
         "dates": [],
         "sources": set(),
         "articles_by_date": {}  # date -> list of articles
@@ -168,9 +169,9 @@ def extract_article_metadata(file_path: str, source: str, date_str: str, base_di
     # Get file modification time as scraped_at
     try:
         mtime = os.path.getmtime(file_path)
-        scraped_at = datetime.fromtimestamp(mtime).isoformat() + "Z"
+        scraped_at = format_datetime(datetime.fromtimestamp(mtime, tz=get_timezone()))
     except:
-        scraped_at = date_str + "T00:00:00Z"
+        scraped_at = date_str + "T00:00:00"
 
     return {
         "id": file_id,

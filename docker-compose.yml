@@ -13,6 +13,7 @@ services:
       - ./config.ini:/app/config.ini
     environment:
       - PYTHONPATH=/app
+      - TZ=UTC
     stdin_open: true
     tty: true
     healthcheck:

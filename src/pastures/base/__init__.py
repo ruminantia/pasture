@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Set, Optional
 import os
 from datetime import datetime
+from core.datetime_utils import now
 
 
 class Pasture(ABC):
@@ -52,11 +53,12 @@ class Pasture(ABC):
             Full path to pasture-specific output directory
         """
         pasture_dir = os.path.join(base_output_dir, self.name)
+        dt = now()
         run_dir = os.path.join(
             pasture_dir,
-            datetime.now().strftime("%Y"),
-            datetime.now().strftime("%m"),
-            datetime.now().strftime("%d"),
+            dt.strftime("%Y"),
+            dt.strftime("%m"),
+            dt.strftime("%d"),
         )
         os.makedirs(run_dir, exist_ok=True)
         return run_dir
