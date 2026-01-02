@@ -1670,10 +1670,11 @@ async function renderStats(dailyData) {
             </div>`;
 
     if (statsData) {
-        // Calculate rejection rate: rejected / (scraped + rejected + duplicates)
-        const totalPosts = (statsData.articles_scraped || 0) + (statsData.articles_rejected_blacklist || 0) + (statsData.articles_skipped_duplicate || 0);
-        const rejectionRate = totalPosts > 0
-            ? ((statsData.articles_rejected_blacklist / totalPosts) * 100).toFixed(1)
+        // Calculate rejection rate: rejected / (scraped + rejected)
+        // Note: Duplicates are excluded since they're previously processed posts
+        const totalUniquePosts = (statsData.articles_scraped || 0) + (statsData.articles_rejected_blacklist || 0);
+        const rejectionRate = totalUniquePosts > 0
+            ? ((statsData.articles_rejected_blacklist / totalUniquePosts) * 100).toFixed(1)
             : 0;
 
         statsHTML += `
