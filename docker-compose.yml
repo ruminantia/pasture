@@ -4,12 +4,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
     container_name: ruminantia-pasture
     restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:
-      - pastures:/app/output
+      - ./output:/app/output
       - ./config.ini:/app/config.ini
     environment:
       - PYTHONPATH=/app
