@@ -347,6 +347,7 @@ case "${1:-}" in
     "restart")
         # Restart the scraper with current configuration
         check_config_file
+        build_image
         restart_scraper
         ;;
     "logs")

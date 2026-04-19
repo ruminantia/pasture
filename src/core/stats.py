@@ -228,12 +228,13 @@ class StatsTracker:
         return []
 
     @staticmethod
-    def get_rejections(output_dir: str, source: str = None, limit: int = 100) -> List[Dict[str, Any]]:
-        """Get rejections, optionally filtered by source.
+    def get_rejections(output_dir: str, source: str = None, date: str = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get rejections, optionally filtered by source and/or date.
 
         Args:
             output_dir: Base output directory
             source: Optional source name to filter by
+            date: Optional date string (YYYY-MM-DD) to filter by
             limit: Maximum number of rejections to return
 
         Returns:
@@ -247,6 +248,17 @@ class StatsTracker:
 
                 if source:
                     all_rejections = [r for r in all_rejections if r.get('source') == source]
+
+                if date:
+                    # Extract date from ISO timestamp (YYYY-MM-DDTHH:MM:SS...)
+                    filtered = []
+                    for r in all_rejections:
+                        rejected_at = r.get('rejected_at', '')
+                        # Extract the date part (first 10 characters of ISO format)
+                        rejection_date = rejected_at[:10] if len(rejected_at) >= 10 else rejected_at
+                        if rejection_date == date:
+                            filtered.append(r)
+                    all_rejections = filtered
 
                 return all_rejections[:limit]
             except Exception as e:

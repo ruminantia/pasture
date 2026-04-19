@@ -334,6 +334,7 @@ def create_index_html(viewer_dir: str) -> None:
         <header>
             <h1>🐄 Pasture</h1>
             <div class="header-controls">
+                <button id="rebuild-ui" aria-label="Rebuild web UI">🔄</button>
                 <button id="rejections-toggle" aria-label="Toggle rejections">🚫</button>
                 <button id="calendar-toggle" aria-label="Toggle calendar">📅</button>
                 <button id="settings-toggle" aria-label="Toggle settings">⚙️</button>
@@ -344,7 +345,7 @@ def create_index_html(viewer_dir: str) -> None:
         <div id="rejections-overlay" class="rejections-overlay">
             <div class="rejections-container">
                 <div class="rejections-header">
-                    <h2>Blacklist Rejections</h2>
+                    <h2>Blacklist Rejections <span id="rejections-date-display"></span></h2>
                     <button id="rejections-close" aria-label="Close rejections">✕</button>
                 </div>
                 <div class="rejections-filters">
@@ -420,7 +421,11 @@ def create_index_html(viewer_dir: str) -> None:
                     <canvas id="source-radar-chart"></canvas>
                 </div>
                 <div class="chart-container">
-                    <h4>Article Metrics</h4>
+                    <h4>Blacklist Term Distribution</h4>
+                    <canvas id="blacklist-bar-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h4>Rejection Rate by Source</h4>
                     <canvas id="metrics-bar-chart"></canvas>
                 </div>
             </div>
@@ -735,6 +740,12 @@ header h1 {
     font-size: 22px;
     color: var(--accent);
     margin: 0;
+}
+
+.rejections-header h2 span {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: normal;
 }
 
 .rejections-header button {
@@ -1249,6 +1260,10 @@ header h1 {
     max-height: 300px;
 }
 
+#blacklist-bar-chart {
+    min-height: 200px;
+}
+
 .logs-section {
     margin-top: 30px;
     background: var(--bg-secondary);
@@ -1473,6 +1488,40 @@ function setupTheme() {
         const next = current === 'light' ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', next);
         localStorage.setItem('theme', next);
+    });
+
+    // Rebuild UI button
+    const rebuildButton = document.getElementById('rebuild-ui');
+    rebuildButton.addEventListener('click', async () => {
+        const originalText = rebuildButton.textContent;
+        rebuildButton.textContent = '⏳';
+        rebuildButton.disabled = true;
+
+        try {
+            const response = await fetch('/api/rebuild-ui', { method: 'POST' });
+            const data = await response.json();
+
+            if (data.success) {
+                // Flash success
+                rebuildButton.textContent = '✓';
+                setTimeout(() => {
+                    rebuildButton.textContent = originalText;
+                }, 1500);
+            } else {
+                rebuildButton.textContent = '✗';
+                setTimeout(() => {
+                    rebuildButton.textContent = originalText;
+                }, 1500);
+            }
+        } catch (error) {
+            console.error('Failed to rebuild UI:', error);
+            rebuildButton.textContent = '✗';
+            setTimeout(() => {
+                rebuildButton.textContent = originalText;
+            }, 1500);
+        } finally {
+            rebuildButton.disabled = false;
+        }
     });
 
     // Rejections overlay toggle
@@ -1771,6 +1820,12 @@ async function selectDate(date) {
         renderArticleList(dailyData.articles);
         renderStats(dailyData);
     }
+
+    // Refresh rejections if overlay is open
+    const rejectionsOverlay = document.getElementById('rejections-overlay');
+    if (rejectionsOverlay.classList.contains('active')) {
+        await loadRejections();
+    }
 }
 
 function renderArticleList(articles) {
@@ -1983,6 +2038,7 @@ async function renderStats(dailyData) {
 
 let radarChart = null;
 let barChart = null;
+let blacklistChart = null;
 
 function renderCharts(bySource, statsData) {
     // Destroy existing charts
@@ -1991,6 +2047,9 @@ function renderCharts(bySource, statsData) {
     }
     if (barChart) {
         barChart.destroy();
+    }
+    if (blacklistChart) {
+        blacklistChart.destroy();
     }
 
     // Theme colors
@@ -2046,28 +2105,102 @@ function renderCharts(bySource, statsData) {
         }
     });
 
-    // Pie chart - Metrics comparison
-    if (statsData) {
-        const pieCtx = document.getElementById('metrics-bar-chart').getContext('2d');
+    // Bar chart - Blacklist term distribution
+    if (statsData && statsData.blacklist_hits_by_term && Object.keys(statsData.blacklist_hits_by_term).length > 0) {
+        const blacklistCtx = document.getElementById('blacklist-bar-chart').getContext('2d');
+        const terms = Object.keys(statsData.blacklist_hits_by_term);
+        const termCounts = Object.values(statsData.blacklist_hits_by_term);
 
-        barChart = new Chart(pieCtx, {
-            type: 'pie',
+        // Sort by count descending
+        const sortedIndices = termCounts.map((_, i) => i).sort((a, b) => termCounts[b] - termCounts[a]);
+        const sortedTerms = sortedIndices.map(i => terms[i]);
+        const sortedCounts = sortedIndices.map(i => termCounts[i]);
+
+        blacklistChart = new Chart(blacklistCtx, {
+            type: 'bar',
             data: {
-                labels: ['Scraped', 'Rejected'],
+                labels: sortedTerms,
                 datasets: [{
-                    data: [
-                        statsData.articles_scraped || 0,
-                        statsData.articles_rejected_blacklist || 0
-                    ],
-                    backgroundColor: [
-                        'rgba(75, 192, 192, 0.7)',
-                        'rgba(255, 99, 132, 0.7)'
-                    ],
-                    borderColor: [
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(255, 99, 132, 1)'
-                    ],
+                    label: 'Rejections',
+                    data: sortedCounts,
+                    backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
                     borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.parsed.x;
+                                const total = sortedCounts.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `Rejections: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: textColor,
+                            precision: 0
+                        },
+                        grid: {
+                            color: gridColor
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: textColor
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Radar chart - Rejection rates per feed
+    if (statsData && statsData.blacklist_hits_by_source && statsData.articles_by_source) {
+        const metricsCtx = document.getElementById('metrics-bar-chart').getContext('2d');
+
+        // Calculate rejection rate per source
+        const sources = [];
+        const rejectionRates = [];
+
+        for (const [source, scraped] of Object.entries(statsData.articles_by_source)) {
+            const rejected = statsData.blacklist_hits_by_source[source] || 0;
+            const total = scraped + rejected;
+            const rate = total > 0 ? ((rejected / total) * 100) : 0;
+            sources.push(source);
+            rejectionRates.push(rate);
+        }
+
+        barChart = new Chart(metricsCtx, {
+            type: 'radar',
+            data: {
+                labels: sources,
+                datasets: [{
+                    label: 'Rejection Rate (%)',
+                    data: rejectionRates,
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(255, 99, 132, 1)'
                 }]
             },
             options: {
@@ -2075,23 +2208,36 @@ function renderCharts(bySource, statsData) {
                 maintainAspectRatio: true,
                 plugins: {
                     legend: {
-                        position: 'bottom',
                         labels: {
-                            color: textColor,
-                            padding: 15,
-                            font: {
-                                size: 13
-                            }
+                            color: textColor
                         }
                     },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                const label = context.label || '';
-                                const value = context.parsed || 0;
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((value / total) * 100).toFixed(1);
-                                return label + ': ' + value + ' (' + percentage + '%)';
+                                const rate = context.parsed.r;
+                                return 'Rejection rate: ' + rate.toFixed(1) + '%';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            color: textColor,
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        },
+                        grid: {
+                            color: gridColor
+                        },
+                        pointLabels: {
+                            color: textColor,
+                            font: {
+                                size: 11
                             }
                         }
                     }
@@ -2248,7 +2394,13 @@ async function loadRejections() {
     container.innerHTML = '<div class="rejections-loading">Loading rejections...</div>';
 
     try {
-        const response = await fetch('/api/rejections');
+        // Build URL with date filter if a date is selected
+        let url = '/api/rejections';
+        if (state.currentDate) {
+            url += `?date=${state.currentDate}`;
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
 
         if (!data.success) {
@@ -2292,6 +2444,14 @@ async function loadRejections() {
             termFilter.appendChild(option);
         });
         termFilter.value = currentTermValue;
+
+        // Update date display
+        const dateDisplay = document.getElementById('rejections-date-display');
+        if (state.currentDate) {
+            dateDisplay.textContent = `(${state.currentDate})`;
+        } else {
+            dateDisplay.textContent = '(all dates)';
+        }
 
         filterRejections();
 
@@ -2441,10 +2601,18 @@ def start_http_server(output_base_dir: str, port: int = 8000) -> None:
                 return
 
             # Rejections API endpoint
-            if self.path == '/api/rejections':
+            if self.path.startswith('/api/rejections'):
                 try:
+                    from urllib.parse import parse_qs, urlparse
                     from core.stats import StatsTracker
-                    rejections = StatsTracker.get_rejections(output_base_dir, limit=1000)
+
+                    parsed = urlparse(self.path)
+                    query_params = parse_qs(parsed.query)
+                    date_param = query_params.get('date', [None])[0]
+
+                    logger.info(f"Rejections API called: path={self.path}, date_param={date_param}")
+
+                    rejections = StatsTracker.get_rejections(output_base_dir, date=date_param, limit=1000)
 
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
@@ -2453,7 +2621,8 @@ def start_http_server(output_base_dir: str, port: int = 8000) -> None:
                     self.wfile.write(json.dumps({
                         'success': True,
                         'rejections': rejections,
-                        'count': len(rejections)
+                        'count': len(rejections),
+                        'filtered_date': date_param
                     }).encode('utf-8'))
                 except Exception as e:
                     logger.error(f"Failed to fetch rejections: {e}")
@@ -2609,6 +2778,35 @@ def start_http_server(output_base_dir: str, port: int = 8000) -> None:
                     self.wfile.write(json.dumps(response_data).encode('utf-8'))
                 except Exception as e:
                     logger.error(f"Failed to save config: {e}")
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    error_data = {
+                        'success': False,
+                        'error': str(e)
+                    }
+                    self.wfile.write(json.dumps(error_data).encode('utf-8'))
+                return
+
+            # Web UI rebuild API endpoint
+            if self.path == '/api/rebuild-ui':
+                try:
+                    # Trigger a web UI regeneration
+                    generate_static_site(output_base_dir)
+
+                    response_data = {
+                        'success': True,
+                        'message': 'Web UI regenerated successfully'
+                    }
+
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(response_data).encode('utf-8'))
+                    logger.info("Web UI rebuilt via API request")
+                except Exception as e:
+                    logger.error(f"Failed to rebuild web UI: {e}")
                     self.send_response(500)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
