@@ -173,10 +173,13 @@ restart_scraper() {
     #
     # Useful for applying configuration changes or running another scrape.
     # The container is stopped and started with the same settings.
+    # Note: This recreates the container to pick up image changes.
     print_status "Restarting Ruminantia Pasture scraper..."
 
     if [ "$USE_COMPOSE" = true ]; then
-        docker compose restart
+        # Use down + up to recreate the container with the new image
+        docker compose down
+        docker compose up -d
     else
         stop_scraper
         start_scraper
