@@ -40,10 +40,15 @@ class RedditPasture(Pasture):
                 if term.lower() in title_lower or term.lower() in url_lower
             ]
 
-            # Track blacklist rejection
+            # Track blacklist rejection - count once per post, not once per term
             if blacklist_matches and self.stats_tracker:
+                # Increment total rejected count once for this post
+                self.stats_tracker.increment_blacklisted_post()
+                # Track each matching term separately for term statistics
                 for term in blacklist_matches:
-                    self.stats_tracker.increment_blacklisted(term)
+                    self.stats_tracker.increment_blacklisted_term(term, self.name)
+                # Track posts rejected per source
+                self.stats_tracker.increment_post_rejected(self.name)
 
             if (
                 not post_data["stickied"]

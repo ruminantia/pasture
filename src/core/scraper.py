@@ -537,7 +537,7 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stat
             ]
 
             if matching_terms:
-                # Record this rejection with details
+                # Record this rejection with details (for rejections.json)
                 rejections_with_details.append({
                     'url': url,
                     'title': title,
@@ -545,11 +545,10 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stat
                     'source': pasture.name
                 })
 
-                # Track in stats
+                # Track in stats - ONLY record rejection details here
+                # The actual counting happens in filter_posts() to avoid double-counting
                 if stats_tracker:
-                    for term in matching_terms:
-                        stats_tracker.increment_blacklisted(term, pasture.name)
-                        stats_tracker.record_rejection(url, title, matching_terms, pasture.name)
+                    stats_tracker.record_rejection(url, title, matching_terms, pasture.name)
 
         # Now do the actual filtering
         if hasattr(pasture, 'set_stats_tracker'):

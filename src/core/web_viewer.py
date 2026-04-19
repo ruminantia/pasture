@@ -1972,8 +1972,8 @@ async function renderStats(dailyData) {
 
         // Build per-source rejection breakdown
         let perSourceBreakdown = '';
-        if (statsData.blacklist_hits_by_source && Object.keys(statsData.blacklist_hits_by_source).length > 0) {
-            const sourceRejections = Object.entries(statsData.blacklist_hits_by_source)
+        if (statsData.posts_rejected_by_source && Object.keys(statsData.posts_rejected_by_source).length > 0) {
+            const sourceRejections = Object.entries(statsData.posts_rejected_by_source)
                 .sort((a, b) => b[1] - a[1]);
 
             perSourceBreakdown = sourceRejections.map(([source, rejected]) => {
@@ -2172,7 +2172,7 @@ function renderCharts(bySource, statsData) {
     }
 
     // Radar chart - Rejection rates per feed
-    if (statsData && statsData.blacklist_hits_by_source && statsData.articles_by_source) {
+    if (statsData && statsData.posts_rejected_by_source && statsData.articles_by_source) {
         const metricsCtx = document.getElementById('metrics-bar-chart').getContext('2d');
 
         // Calculate rejection rate per source
@@ -2180,7 +2180,7 @@ function renderCharts(bySource, statsData) {
         const rejectionRates = [];
 
         for (const [source, scraped] of Object.entries(statsData.articles_by_source)) {
-            const rejected = statsData.blacklist_hits_by_source[source] || 0;
+            const rejected = statsData.posts_rejected_by_source[source] || 0;
             const total = scraped + rejected;
             const rate = total > 0 ? ((rejected / total) * 100) : 0;
             sources.push(source);

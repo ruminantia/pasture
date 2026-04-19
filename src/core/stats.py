@@ -23,8 +23,9 @@ class StatsTracker:
             'articles_skipped_duplicate': 0,
             'articles_rejected_blacklist': 0,
             'blacklist_hits_by_term': defaultdict(int),
-            'blacklist_hits_by_source': defaultdict(int),  # Track rejections per source
+            'blacklist_hits_by_source': defaultdict(int),  # Track term hits per source
             'blacklist_hits_by_source_and_term': defaultdict(lambda: defaultdict(int)),  # Track term hits per source
+            'posts_rejected_by_source': defaultdict(int),  # Track posts rejected per source
             'articles_by_source': defaultdict(int),
             'errors': 0,
             'sources_processed': []
@@ -50,6 +51,21 @@ class StatsTracker:
         if source:
             self.session_stats['blacklist_hits_by_source'][source] += 1
             self.session_stats['blacklist_hits_by_source_and_term'][source][term] += 1
+
+    def increment_blacklisted_post(self):
+        """Increment the total count of rejected posts (once per post, not per term)."""
+        self.session_stats['articles_rejected_blacklist'] += 1
+
+    def increment_blacklisted_term(self, term: str, source: str = None):
+        """Increment blacklist term hit counter."""
+        self.session_stats['blacklist_hits_by_term'][term] += 1
+        if source:
+            self.session_stats['blacklist_hits_by_source'][source] += 1
+            self.session_stats['blacklist_hits_by_source_and_term'][source][term] += 1
+
+    def increment_post_rejected(self, source: str):
+        """Increment posts rejected counter for a specific source."""
+        self.session_stats['posts_rejected_by_source'][source] += 1
 
     def record_rejection(self, url: str, title: str, matching_terms: List[str], source: str):
         """Record a detailed rejection entry.
@@ -122,6 +138,7 @@ class StatsTracker:
                 'blacklist_hits_by_term': dict(self.session_stats['blacklist_hits_by_term']),
                 'blacklist_hits_by_source': dict(self.session_stats['blacklist_hits_by_source']),
                 'blacklist_hits_by_source_and_term': blacklist_by_source_term,
+                'posts_rejected_by_source': dict(self.session_stats['posts_rejected_by_source']),
                 'articles_by_source': dict(self.session_stats['articles_by_source']),
                 'errors': self.session_stats['errors'],
                 'sources_processed': self.session_stats['sources_processed']
@@ -143,6 +160,7 @@ class StatsTracker:
                     'blacklist_hits_by_term': {},
                     'blacklist_hits_by_source': {},
                     'blacklist_hits_by_source_and_term': {},
+                    'posts_rejected_by_source': {},
                     'articles_by_source': {},
                     'sessions_count': 0
                 }
@@ -172,6 +190,10 @@ class StatsTracker:
             # Merge source counts
             for source, count in session_data['articles_by_source'].items():
                 daily['articles_by_source'][source] = daily['articles_by_source'].get(source, 0) + count
+
+            # Merge posts rejected by source
+            for source, count in session_data['posts_rejected_by_source'].items():
+                daily['posts_rejected_by_source'][source] = daily['posts_rejected_by_source'].get(source, 0) + count
 
             # Keep only last 90 days
             dates_to_keep = sorted(all_stats['daily'].keys(), reverse=True)[:90]
