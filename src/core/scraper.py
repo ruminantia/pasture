@@ -403,7 +403,36 @@ def create_driver_with_retry(max_retries: int = 3) -> webdriver.Firefox:
                 )
 
 
-def scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: List[str] = None) -> bool:
+def categorize_error(error: Exception) -> str:
+    """Categorize an error into a type for better tracking.
+
+    Args:
+        error: The exception to categorize
+
+    Returns:
+        Error type string
+    """
+    error_str = str(error).lower()
+    error_type = error.__class__.__name__.lower()
+
+    if 'timeout' in error_str or 'timed out' in error_str:
+        return 'timeout'
+    elif 'dns' in error_str or 'namenotresolved' in error_str or 'hostnotfound' in error_str:
+        return 'dns'
+    elif 'driver' in error_str or 'geckodriver' in error_str or 'firefox' in error_str:
+        return 'driver'
+    elif 'http' in error_type or 'connection' in error_str:
+        return 'http'
+    elif 'certificate' in error_str or 'ssl' in error_str or 'tls' in error_str:
+        return 'certificate'
+    elif 'blocked' in error_str or '403' in error_str or 'forbidden' in error_str:
+        return 'blocked'
+    else:
+        return 'unknown'
+
+
+def scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: List[str] = None,
+               source: str = None, stats_tracker: StatsTracker = None) -> bool:
     """Scrapes the content of a URL using Selenium.
 
     Args:
@@ -411,6 +440,8 @@ def scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: 
         output_dir: Directory to save the scraped content
         tags_to_remove: List of HTML tags to remove during processing
         blacklist: Optional list of blacklist terms to check against scraped content
+        source: Optional source name for error tracking
+        stats_tracker: Optional StatsTracker instance for collecting statistics
 
     Returns:
         True if scraping was successful, False otherwise
@@ -444,14 +475,15 @@ def scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: 
         return True
 
     except Exception as e:
-        logger.error(f"❌ Failed to scrape: {url}")
+        error_type = categorize_error(e)
+        logger.error(f"❌ Failed to scrape: {url} ({error_type})")
+        # Record error details
+        if stats_tracker and source:
+            stats_tracker.record_error(url, error_type, str(e), source)
         # Try fallback for timeout, DNS, or driver issues
-        if any(
-            error_type in str(e).lower()
-            for error_type in ["timeout", "dns", "driver", "firefox", "navigation"]
-        ):
+        if error_type in ('timeout', 'dns', 'driver'):
             logger.info("🔄 Attempting fallback method")
-            return fallback_scrape_url(url, output_dir, tags_to_remove)
+            return fallback_scrape_url(url, output_dir, tags_to_remove, blacklist, source, stats_tracker)
         return False
 
     finally:
@@ -569,7 +601,7 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stat
                 continue
 
             if pasture.should_scrape_url(external_url, processed_urls):
-                if scrape_url(external_url, output_dir, tags_to_remove, blacklist):
+                if scrape_url(external_url, output_dir, tags_to_remove, blacklist, pasture.name, stats_tracker):
                     pasture.mark_url_processed(external_url, processed_urls)
                     new_urls_scraped += 1
                     # Track successful scrape
@@ -578,7 +610,7 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stat
                 else:
                     logger.warning(f"❌ Failed: {external_url}")
                     # Try fallback method
-                    if fallback_scrape_url(external_url, output_dir, tags_to_remove, blacklist):
+                    if fallback_scrape_url(external_url, output_dir, tags_to_remove, blacklist, pasture.name, stats_tracker):
                         pasture.mark_url_processed(external_url, processed_urls)
                         new_urls_scraped += 1
                         # Track successful scrape
@@ -627,7 +659,8 @@ def is_media_url(url: str) -> bool:
     return False
 
 
-def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: List[str] = None) -> bool:
+def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: List[str] = None,
+                        source: str = None, stats_tracker: StatsTracker = None) -> bool:
     """Fallback scraping method using requests + BeautifulSoup for simple sites.
 
     Args:
@@ -635,6 +668,8 @@ def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str], bl
         output_dir: Directory to save the scraped content
         tags_to_remove: List of HTML tags to remove during processing
         blacklist: Optional list of blacklist terms to check against scraped content
+        source: Optional source name for error tracking
+        stats_tracker: Optional StatsTracker instance for collecting statistics
 
     Returns:
         True if scraping was successful, False otherwise
@@ -678,5 +713,9 @@ def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str], bl
         return True
 
     except Exception as e:
-        logger.error(f"❌ Fallback failed: {url}")
+        error_type = categorize_error(e)
+        logger.error(f"❌ Fallback failed: {url} ({error_type})")
+        # Record error details
+        if stats_tracker and source:
+            stats_tracker.record_error(url, error_type, str(e), source)
         return False

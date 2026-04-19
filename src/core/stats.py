@@ -17,6 +17,7 @@ class StatsTracker:
         self.output_dir = output_dir
         self.stats_file = os.path.join(output_dir, 'stats.json')
         self.rejections_file = os.path.join(output_dir, 'rejections.json')
+        self.errors_file = os.path.join(output_dir, 'errors.json')
         self.session_stats = {
             'start_time': format_datetime(now()),
             'articles_scraped': 0,
@@ -34,6 +35,10 @@ class StatsTracker:
         self.session_rejections: List[Dict[str, Any]] = []
         # Track URLs we've already recorded as rejected to avoid duplicates
         self._recorded_rejections: Set[str] = set()
+        # Track detailed errors for this session
+        self.session_errors: List[Dict[str, Any]] = []
+        # Track URLs we've already recorded as errors to avoid duplicates
+        self._recorded_errors: Set[str] = set()
 
     def increment_scraped(self, source: str):
         """Increment articles scraped counter."""
@@ -98,6 +103,34 @@ class StatsTracker:
     def increment_error(self):
         """Increment error counter."""
         self.session_stats['errors'] += 1
+
+    def record_error(self, url: str, error_type: str, error_message: str, source: str):
+        """Record a detailed error entry.
+
+        Args:
+            url: The URL that failed to scrape
+            error_type: Category of error (timeout, dns, driver, blocked, etc.)
+            error_message: The actual error message
+            source: The pasture/source name
+        """
+        # Create a unique key for this URL to avoid duplicate records
+        url_key = f"{source}:{url}"
+
+        # Skip if we've already recorded this URL
+        if url_key in self._recorded_errors:
+            return
+
+        self._recorded_errors.add(url_key)
+
+        error_entry = {
+            'url': url,
+            'error_type': error_type,
+            'error_message': str(error_message)[:500],  # Limit length
+            'source': source,
+            'failed_at': format_datetime(now())
+        }
+
+        self.session_errors.append(error_entry)
 
     def add_source(self, source: str):
         """Add a processed source."""
@@ -206,6 +239,9 @@ class StatsTracker:
             # Save rejections
             self._save_rejections()
 
+            # Save errors
+            self._save_errors()
+
             logger.info(f"📊 Session stats saved: {session_data['articles_scraped']} scraped, "
                        f"{session_data['articles_rejected_blacklist']} rejected, "
                        f"{session_data['articles_skipped_duplicate']} duplicates")
@@ -285,6 +321,85 @@ class StatsTracker:
                 return all_rejections[:limit]
             except Exception as e:
                 logger.error(f"Failed to load rejections: {e}")
+                return []
+        return []
+
+    def _save_errors(self):
+        """Save error details to file."""
+        try:
+            # Load existing errors
+            existing_errors = self._load_errors()
+
+            # Add new errors from this session
+            existing_errors.extend(self.session_errors)
+
+            # Sort by failed_at descending (newest first)
+            existing_errors.sort(key=lambda r: r.get('failed_at', ''), reverse=True)
+
+            # Keep only last 1000 errors to prevent file from growing too large
+            if len(existing_errors) > 1000:
+                existing_errors = existing_errors[:1000]
+
+            # Save to file
+            with open(self.errors_file, 'w', encoding='utf-8') as f:
+                json.dump(existing_errors, f, indent=2)
+
+            logger.info(f"❌ Saved {len(self.session_errors)} new errors")
+
+        except Exception as e:
+            logger.error(f"Failed to save errors: {e}")
+
+    def _load_errors(self) -> List[Dict[str, Any]]:
+        """Load existing errors from file."""
+        if os.path.exists(self.errors_file):
+            try:
+                with open(self.errors_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.warning(f"Failed to load errors file: {e}")
+                return []
+        return []
+
+    @staticmethod
+    def get_errors(output_dir: str, source: str = None, date: str = None, error_type: str = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get errors, optionally filtered by source, date, and/or error type.
+
+        Args:
+            output_dir: Base output directory
+            source: Optional source name to filter by
+            date: Optional date string (YYYY-MM-DD) to filter by
+            error_type: Optional error type to filter by
+            limit: Maximum number of errors to return
+
+        Returns:
+            List of error entries
+        """
+        errors_file = os.path.join(output_dir, 'errors.json')
+        if os.path.exists(errors_file):
+            try:
+                with open(errors_file, 'r', encoding='utf-8') as f:
+                    all_errors = json.load(f)
+
+                if source:
+                    all_errors = [r for r in all_errors if r.get('source') == source]
+
+                if date:
+                    # Extract date from ISO timestamp (YYYY-MM-DDTHH:MM:SS...)
+                    filtered = []
+                    for r in all_errors:
+                        failed_at = r.get('failed_at', '')
+                        # Extract the date part (first 10 characters of ISO format)
+                        error_date = failed_at[:10] if len(failed_at) >= 10 else failed_at
+                        if error_date == date:
+                            filtered.append(r)
+                    all_errors = filtered
+
+                if error_type:
+                    all_errors = [r for r in all_errors if r.get('error_type') == error_type]
+
+                return all_errors[:limit]
+            except Exception as e:
+                logger.error(f"Failed to load errors: {e}")
                 return []
         return []
 

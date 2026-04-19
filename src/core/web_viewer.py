@@ -336,6 +336,7 @@ def create_index_html(viewer_dir: str) -> None:
             <div class="header-controls">
                 <button id="rebuild-ui" aria-label="Rebuild web UI">🔄</button>
                 <button id="rejections-toggle" aria-label="Toggle rejections">🚫</button>
+                <button id="errors-toggle" aria-label="Toggle errors">❌</button>
                 <button id="calendar-toggle" aria-label="Toggle calendar">📅</button>
                 <button id="settings-toggle" aria-label="Toggle settings">⚙️</button>
                 <button id="theme-toggle" aria-label="Toggle theme">◐</button>
@@ -359,6 +360,27 @@ def create_index_html(viewer_dir: str) -> None:
                 </div>
                 <div class="rejections-content">
                     <div id="rejections-list" class="rejections-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="errors-overlay" class="errors-overlay">
+            <div class="errors-container">
+                <div class="errors-header">
+                    <h2>Scraping Errors <span id="errors-date-display"></span></h2>
+                    <button id="errors-close" aria-label="Close errors">✕</button>
+                </div>
+                <div class="errors-filters">
+                    <select id="errors-source-filter">
+                        <option value="all">All Sources</option>
+                    </select>
+                    <select id="errors-type-filter">
+                        <option value="all">All Types</option>
+                    </select>
+                    <button id="errors-refresh">Refresh</button>
+                </div>
+                <div class="errors-content">
+                    <div id="errors-list" class="errors-list"></div>
                 </div>
             </div>
         </div>
@@ -879,6 +901,195 @@ header h1 {
 }
 
 .rejections-loading {
+    text-align: center;
+    padding: 50px 20px;
+    color: var(--text-secondary);
+}
+
+/* Errors overlay - similar to rejections */
+.errors-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.errors-overlay.active {
+    display: flex;
+}
+
+.errors-container {
+    background: var(--bg-secondary);
+    padding: 25px;
+    border-radius: 8px;
+    max-width: 900px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+}
+
+.errors-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border);
+}
+
+.errors-header h2 {
+    font-size: 22px;
+    color: var(--accent);
+    margin: 0;
+}
+
+.errors-header h2 span {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: normal;
+}
+
+.errors-header button {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 20px;
+    transition: background 0.2s;
+}
+
+.errors-header button:hover {
+    background: var(--bg-hover);
+}
+
+.errors-filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.errors-filters select {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.errors-filters button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: opacity 0.2s;
+}
+
+.errors-filters button:hover {
+    opacity: 0.9;
+}
+
+.errors-content {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 300px;
+}
+
+.errors-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.error-item {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-left: 3px solid #ff6b6b;
+    border-radius: 4px;
+    padding: 12px;
+}
+
+.error-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.error-type {
+    font-weight: bold;
+    color: #ff6b6b;
+    text-transform: uppercase;
+    font-size: 11px;
+    background: rgba(255, 107, 107, 0.1);
+    padding: 3px 8px;
+    border-radius: 3px;
+}
+
+.error-source {
+    font-size: 11px;
+    background: var(--bg-secondary);
+    padding: 3px 8px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.error-url {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    word-break: break-all;
+}
+
+.error-url a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.error-url a:hover {
+    text-decoration: underline;
+}
+
+.error-message {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    padding: 8px;
+    border-radius: 3px;
+    font-family: monospace;
+    margin-bottom: 8px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.error-meta {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.errors-empty {
+    text-align: center;
+    padding: 50px 20px;
+    color: var(--text-secondary);
+}
+
+.errors-loading {
     text-align: center;
     padding: 50px 20px;
     color: var(--text-secondary);
@@ -1467,7 +1678,10 @@ const state = {
     datesWithContent: new Set(),
     rejections: [],
     allRejectionTerms: new Set(),
-    allRejectionSources: new Set()
+    allRejectionSources: new Set(),
+    errors: [],
+    allErrorTypes: new Set(),
+    allErrorSources: new Set()
 };
 
 // Initialize
@@ -1554,6 +1768,38 @@ function setupTheme() {
     termFilter.addEventListener('change', filterRejections);
     refreshButton.addEventListener('click', async () => {
         await loadRejections();
+    });
+
+    // Errors overlay toggle
+    const errorsOverlay = document.getElementById('errors-overlay');
+    const errorsToggle = document.getElementById('errors-toggle');
+    const errorsClose = document.getElementById('errors-close');
+
+    errorsToggle.addEventListener('click', async () => {
+        errorsOverlay.classList.add('active');
+        await loadErrors();
+    });
+
+    errorsClose.addEventListener('click', () => {
+        errorsOverlay.classList.remove('active');
+    });
+
+    // Close errors when clicking outside
+    errorsOverlay.addEventListener('click', (e) => {
+        if (e.target === errorsOverlay) {
+            errorsOverlay.classList.remove('active');
+        }
+    });
+
+    // Errors filters
+    const errorsSourceFilter = document.getElementById('errors-source-filter');
+    const errorsTypeFilter = document.getElementById('errors-type-filter');
+    const errorsRefreshButton = document.getElementById('errors-refresh');
+
+    errorsSourceFilter.addEventListener('change', filterErrors);
+    errorsTypeFilter.addEventListener('change', filterErrors);
+    errorsRefreshButton.addEventListener('click', async () => {
+        await loadErrors();
     });
 
     // Calendar overlay toggle
@@ -2499,6 +2745,114 @@ function filterRejections() {
         </div>
     `).join('');
 }
+
+// Errors Management
+async function loadErrors() {
+    const container = document.getElementById('errors-list');
+    container.innerHTML = '<div class="errors-loading">Loading errors...</div>';
+
+    try {
+        // Build URL with date filter if a date is selected
+        let url = '/api/errors';
+        if (state.currentDate) {
+            url += `?date=${state.currentDate}`;
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!data.success) {
+            container.innerHTML = '<div class="errors-empty">Failed to load errors</div>';
+            return;
+        }
+
+        state.errors = data.errors || [];
+
+        // Build unique sets for filters
+        state.allErrorSources.clear();
+        state.allErrorTypes.clear();
+
+        state.errors.forEach(e => {
+            if (e.source) state.allErrorSources.add(e.source);
+            if (e.error_type) state.allErrorTypes.add(e.error_type);
+        });
+
+        // Populate source filter
+        const sourceFilter = document.getElementById('errors-source-filter');
+        const currentSourceValue = sourceFilter.value;
+        sourceFilter.innerHTML = '<option value="all">All Sources</option>';
+        Array.from(state.allErrorSources).sort().forEach(source => {
+            const option = document.createElement('option');
+            option.value = source;
+            option.textContent = source;
+            sourceFilter.appendChild(option);
+        });
+        sourceFilter.value = currentSourceValue;
+
+        // Populate type filter
+        const typeFilter = document.getElementById('errors-type-filter');
+        const currentTypeValue = typeFilter.value;
+        typeFilter.innerHTML = '<option value="all">All Types</option>';
+        Array.from(state.allErrorTypes).sort().forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+            typeFilter.appendChild(option);
+        });
+        typeFilter.value = currentTypeValue;
+
+        // Update date display
+        const dateDisplay = document.getElementById('errors-date-display');
+        if (state.currentDate) {
+            dateDisplay.textContent = `(${state.currentDate})`;
+        } else {
+            dateDisplay.textContent = '(all dates)';
+        }
+
+        filterErrors();
+
+    } catch (error) {
+        console.error('Failed to load errors:', error);
+        container.innerHTML = '<div class="errors-empty">Failed to load errors</div>';
+    }
+}
+
+function filterErrors() {
+    const sourceFilter = document.getElementById('errors-source-filter').value;
+    const typeFilter = document.getElementById('errors-type-filter').value;
+    const container = document.getElementById('errors-list');
+
+    let filtered = state.errors;
+
+    if (sourceFilter !== 'all') {
+        filtered = filtered.filter(e => e.source === sourceFilter);
+    }
+
+    if (typeFilter !== 'all') {
+        filtered = filtered.filter(e => e.error_type === typeFilter);
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="errors-empty">No errors found</div>';
+        return;
+    }
+
+    container.innerHTML = filtered.map(e => `
+        <div class="error-item">
+            <div class="error-item-header">
+                <div class="error-type">${escapeHtml(e.error_type || 'unknown')}</div>
+                <div class="error-source">${escapeHtml(e.source || 'Unknown')}</div>
+            </div>
+            <div class="error-url">
+                <a href="${escapeHtml(e.url)}" target="_blank" rel="noopener">${escapeHtml(e.url)}</a>
+            </div>
+            ${e.error_message ? `<div class="error-message">${escapeHtml(e.error_message)}</div>` : ''}
+            <div class="error-meta">
+                Failed: ${e.failed_at || 'Unknown'}
+            </div>
+        </div>
+    `).join('');
+}
 """
 
     js_path = os.path.join(assets_dir, "app.js")
@@ -2626,6 +2980,49 @@ def start_http_server(output_base_dir: str, port: int = 8000) -> None:
                     }).encode('utf-8'))
                 except Exception as e:
                     logger.error(f"Failed to fetch rejections: {e}")
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        'success': False,
+                        'error': str(e)
+                    }).encode('utf-8'))
+                return
+
+            # Errors API endpoint
+            if self.path.startswith('/api/errors'):
+                try:
+                    from urllib.parse import parse_qs, urlparse
+                    from core.stats import StatsTracker
+
+                    parsed = urlparse(self.path)
+                    query_params = parse_qs(parsed.query)
+                    date_param = query_params.get('date', [None])[0]
+                    source_param = query_params.get('source', [None])[0]
+                    error_type_param = query_params.get('error_type', [None])[0]
+
+                    logger.info(f"Errors API called: path={self.path}, date_param={date_param}")
+
+                    errors = StatsTracker.get_errors(
+                        output_base_dir,
+                        date=date_param,
+                        source=source_param,
+                        error_type=error_type_param,
+                        limit=1000
+                    )
+
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        'success': True,
+                        'errors': errors,
+                        'count': len(errors),
+                        'filtered_date': date_param
+                    }).encode('utf-8'))
+                except Exception as e:
+                    logger.error(f"Failed to fetch errors: {e}")
                     self.send_response(500)
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
