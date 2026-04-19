@@ -334,11 +334,33 @@ def create_index_html(viewer_dir: str) -> None:
         <header>
             <h1>🐄 Pasture</h1>
             <div class="header-controls">
+                <button id="rejections-toggle" aria-label="Toggle rejections">🚫</button>
                 <button id="calendar-toggle" aria-label="Toggle calendar">📅</button>
                 <button id="settings-toggle" aria-label="Toggle settings">⚙️</button>
                 <button id="theme-toggle" aria-label="Toggle theme">◐</button>
             </div>
         </header>
+
+        <div id="rejections-overlay" class="rejections-overlay">
+            <div class="rejections-container">
+                <div class="rejections-header">
+                    <h2>Blacklist Rejections</h2>
+                    <button id="rejections-close" aria-label="Close rejections">✕</button>
+                </div>
+                <div class="rejections-filters">
+                    <select id="rejections-source-filter">
+                        <option value="all">All Sources</option>
+                    </select>
+                    <select id="rejections-term-filter">
+                        <option value="all">All Terms</option>
+                    </select>
+                    <button id="rejections-refresh">Refresh</button>
+                </div>
+                <div class="rejections-content">
+                    <div id="rejections-list" class="rejections-list"></div>
+                </div>
+            </div>
+        </div>
 
         <div id="calendar-overlay" class="calendar-overlay">
             <div class="calendar-container">
@@ -668,6 +690,187 @@ header h1 {
 
 .save-status.error {
     color: #f44336;
+}
+
+.rejections-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.rejections-overlay.active {
+    display: flex;
+}
+
+.rejections-container {
+    background: var(--bg-secondary);
+    padding: 25px;
+    border-radius: 8px;
+    max-width: 900px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+}
+
+.rejections-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border);
+}
+
+.rejections-header h2 {
+    font-size: 22px;
+    color: var(--accent);
+    margin: 0;
+}
+
+.rejections-header button {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 20px;
+    transition: background 0.2s;
+}
+
+.rejections-header button:hover {
+    background: var(--bg-hover);
+}
+
+.rejections-filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.rejections-filters select {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.rejections-filters button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: opacity 0.2s;
+}
+
+.rejections-filters button:hover {
+    opacity: 0.9;
+}
+
+.rejections-content {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 300px;
+}
+
+.rejections-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rejection-item {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+}
+
+.rejection-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.rejection-title {
+    font-weight: bold;
+    color: var(--text-primary);
+    flex: 1;
+    margin-right: 10px;
+}
+
+.rejection-source {
+    font-size: 11px;
+    background: var(--bg-secondary);
+    padding: 3px 8px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.rejection-url {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    word-break: break-all;
+}
+
+.rejection-url a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.rejection-url a:hover {
+    text-decoration: underline;
+}
+
+.rejection-reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.rejection-reason-tag {
+    background: #ff4444;
+    color: white;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+}
+
+.rejection-meta {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 8px;
+}
+
+.rejections-empty {
+    text-align: center;
+    padding: 50px 20px;
+    color: var(--text-secondary);
+}
+
+.rejections-loading {
+    text-align: center;
+    padding: 50px 20px;
+    color: var(--text-secondary);
 }
 
 .calendar-header {
@@ -1246,7 +1449,10 @@ const state = {
     currentMonth: new Date(),
     selectedSource: 'all',
     selectedArticle: null,
-    datesWithContent: new Set()
+    datesWithContent: new Set(),
+    rejections: [],
+    allRejectionTerms: new Set(),
+    allRejectionSources: new Set()
 };
 
 // Initialize
@@ -1267,6 +1473,38 @@ function setupTheme() {
         const next = current === 'light' ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', next);
         localStorage.setItem('theme', next);
+    });
+
+    // Rejections overlay toggle
+    const rejectionsOverlay = document.getElementById('rejections-overlay');
+    const rejectionsToggle = document.getElementById('rejections-toggle');
+    const rejectionsClose = document.getElementById('rejections-close');
+
+    rejectionsToggle.addEventListener('click', async () => {
+        rejectionsOverlay.classList.add('active');
+        await loadRejections();
+    });
+
+    rejectionsClose.addEventListener('click', () => {
+        rejectionsOverlay.classList.remove('active');
+    });
+
+    // Close rejections when clicking outside
+    rejectionsOverlay.addEventListener('click', (e) => {
+        if (e.target === rejectionsOverlay) {
+            rejectionsOverlay.classList.remove('active');
+        }
+    });
+
+    // Rejections filters
+    const sourceFilter = document.getElementById('rejections-source-filter');
+    const termFilter = document.getElementById('rejections-term-filter');
+    const refreshButton = document.getElementById('rejections-refresh');
+
+    sourceFilter.addEventListener('change', filterRejections);
+    termFilter.addEventListener('change', filterRejections);
+    refreshButton.addEventListener('click', async () => {
+        await loadRejections();
     });
 
     // Calendar overlay toggle
@@ -1677,16 +1915,41 @@ async function renderStats(dailyData) {
             ? ((statsData.articles_rejected_blacklist / totalUniquePosts) * 100).toFixed(1)
             : 0;
 
+        // Build per-source rejection breakdown
+        let perSourceBreakdown = '';
+        if (statsData.blacklist_hits_by_source && Object.keys(statsData.blacklist_hits_by_source).length > 0) {
+            const sourceRejections = Object.entries(statsData.blacklist_hits_by_source)
+                .sort((a, b) => b[1] - a[1]);
+
+            perSourceBreakdown = sourceRejections.map(([source, rejected]) => {
+                const scraped = statsData.articles_by_source?.[source] || 0;
+                const sourceTotal = scraped + rejected;
+                const sourceRate = sourceTotal > 0 ? ((rejected / sourceTotal) * 100).toFixed(1) : 0;
+                return `
+                    <div class="stat-breakdown-item">
+                        <span>${escapeHtml(source)}</span>
+                        <span>${rejected} (${sourceRate}%)</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
         statsHTML += `
             <div class="stat-card">
                 <div class="stat-label">Blacklist Rejections</div>
                 <div class="stat-value">${statsData.articles_rejected_blacklist || 0}</div>
                 <div class="stat-breakdown">
                     <div class="stat-breakdown-item">
-                        <span>Rejection rate</span>
+                        <span>Overall rate</span>
                         <span>${rejectionRate}%</span>
                     </div>
                 </div>
+                ${perSourceBreakdown ? `
+                    <div class="stat-breakdown stat-breakdown-scroll">
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Per-source:</div>
+                        ${perSourceBreakdown}
+                    </div>
+                ` : ''}
             </div>`;
 
         // Blacklist terms
@@ -1978,6 +2241,104 @@ function showError(message) {
     const viewer = document.getElementById('article-content');
     viewer.innerHTML = `<div class="error">${message}</div>`;
 }
+
+// Rejections Management
+async function loadRejections() {
+    const container = document.getElementById('rejections-list');
+    container.innerHTML = '<div class="rejections-loading">Loading rejections...</div>';
+
+    try {
+        const response = await fetch('/api/rejections');
+        const data = await response.json();
+
+        if (!data.success) {
+            container.innerHTML = '<div class="rejections-empty">Failed to load rejections</div>';
+            return;
+        }
+
+        state.rejections = data.rejections || [];
+
+        // Build unique sets for filters
+        state.allRejectionSources.clear();
+        state.allRejectionTerms.clear();
+
+        state.rejections.forEach(r => {
+            if (r.source) state.allRejectionSources.add(r.source);
+            if (r.matching_terms) {
+                r.matching_terms.forEach(t => state.allRejectionTerms.add(t));
+            }
+        });
+
+        // Populate source filter
+        const sourceFilter = document.getElementById('rejections-source-filter');
+        const currentSourceValue = sourceFilter.value;
+        sourceFilter.innerHTML = '<option value="all">All Sources</option>';
+        Array.from(state.allRejectionSources).sort().forEach(source => {
+            const option = document.createElement('option');
+            option.value = source;
+            option.textContent = source;
+            sourceFilter.appendChild(option);
+        });
+        sourceFilter.value = currentSourceValue;
+
+        // Populate term filter
+        const termFilter = document.getElementById('rejections-term-filter');
+        const currentTermValue = termFilter.value;
+        termFilter.innerHTML = '<option value="all">All Terms</option>';
+        Array.from(state.allRejectionTerms).sort().forEach(term => {
+            const option = document.createElement('option');
+            option.value = term;
+            option.textContent = term;
+            termFilter.appendChild(option);
+        });
+        termFilter.value = currentTermValue;
+
+        filterRejections();
+
+    } catch (error) {
+        console.error('Failed to load rejections:', error);
+        container.innerHTML = '<div class="rejections-empty">Failed to load rejections</div>';
+    }
+}
+
+function filterRejections() {
+    const sourceFilter = document.getElementById('rejections-source-filter').value;
+    const termFilter = document.getElementById('rejections-term-filter').value;
+    const container = document.getElementById('rejections-list');
+
+    let filtered = state.rejections;
+
+    if (sourceFilter !== 'all') {
+        filtered = filtered.filter(r => r.source === sourceFilter);
+    }
+
+    if (termFilter !== 'all') {
+        filtered = filtered.filter(r => r.matching_terms && r.matching_terms.includes(termFilter));
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="rejections-empty">No rejections found</div>';
+        return;
+    }
+
+    container.innerHTML = filtered.map(r => `
+        <div class="rejection-item">
+            <div class="rejection-item-header">
+                <div class="rejection-title">${escapeHtml(r.title || 'Untitled')}</div>
+                <div class="rejection-source">${escapeHtml(r.source || 'Unknown')}</div>
+            </div>
+            <div class="rejection-url">
+                <a href="${escapeHtml(r.url)}" target="_blank" rel="noopener">${escapeHtml(r.url)}</a>
+            </div>
+            <div class="rejection-reasons">
+                ${r.matching_terms.map(t => `<span class="rejection-reason-tag">${escapeHtml(t)}</span>`).join('')}
+            </div>
+            <div class="rejection-meta">
+                Rejected: ${r.rejected_at || 'Unknown'}
+            </div>
+        </div>
+    `).join('');
+}
 """
 
     js_path = os.path.join(assets_dir, "app.js")
@@ -2077,6 +2438,32 @@ def start_http_server(output_base_dir: str, port: int = 8000) -> None:
                     logger.error(f"Failed to list logs: {e}")
                     self.send_response(500)
                     self.end_headers()
+                return
+
+            # Rejections API endpoint
+            if self.path == '/api/rejections':
+                try:
+                    from core.stats import StatsTracker
+                    rejections = StatsTracker.get_rejections(output_base_dir, limit=1000)
+
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        'success': True,
+                        'rejections': rejections,
+                        'count': len(rejections)
+                    }).encode('utf-8'))
+                except Exception as e:
+                    logger.error(f"Failed to fetch rejections: {e}")
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        'success': False,
+                        'error': str(e)
+                    }).encode('utf-8'))
                 return
 
             # Config API endpoint

@@ -516,6 +516,42 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stat
         posts = pasture.fetch_posts()
 
         # Pass stats tracker to filter_posts so it can track rejections
+        # Also collect rejections with details
+        rejections_with_details = []
+
+        # Get blacklist for post-scrape checking
+        blacklist = pasture.get_blacklist()
+
+        # First pass: filter posts and collect rejection details
+        for post in posts:
+            post_data = post.get("data", post)  # Handle both Reddit dict and plain dict
+            title = post_data.get("title", "")
+            url = pasture.get_url_from_post(post)
+            title_lower = title.lower()
+            url_lower = url.lower()
+
+            # Check for blacklist matches
+            matching_terms = [
+                term for term in blacklist
+                if term.lower() in title_lower or term.lower() in url_lower
+            ]
+
+            if matching_terms:
+                # Record this rejection with details
+                rejections_with_details.append({
+                    'url': url,
+                    'title': title,
+                    'matching_terms': matching_terms,
+                    'source': pasture.name
+                })
+
+                # Track in stats
+                if stats_tracker:
+                    for term in matching_terms:
+                        stats_tracker.increment_blacklisted(term, pasture.name)
+                        stats_tracker.record_rejection(url, title, matching_terms, pasture.name)
+
+        # Now do the actual filtering
         if hasattr(pasture, 'set_stats_tracker'):
             pasture.set_stats_tracker(stats_tracker)
 
@@ -523,7 +559,6 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stat
 
         output_dir = pasture.get_output_directory(base_output_dir)
         tags_to_remove = pasture.get_tags_to_remove()
-        blacklist = pasture.get_blacklist()
 
         new_urls_scraped = 0
         for post in filtered_posts:
