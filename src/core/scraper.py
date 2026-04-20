@@ -246,13 +246,18 @@ def hash_url(url: str) -> str:
     return hashlib.sha256(normalized_url.encode("utf-8")).hexdigest()
 
 
-def post_process_html(file_path: str, tags_to_remove: List[str], blacklist: List[str] = None) -> None:
+def post_process_html(file_path: str, tags_to_remove: List[str], blacklist: List[str] = None,
+                     pasture_config: dict = None) -> str | None:
     """Post-process an HTML file using BeautifulSoup and converts it to Markdown.
 
     Args:
         file_path: Path to the HTML file
         tags_to_remove: List of HTML tag names to remove
         blacklist: Optional list of blacklist terms to check against scraped content
+        pasture_config: Optional pasture configuration for LLM processing
+
+    Returns:
+        Path to the created markdown file, or None if processing failed
     """
     filename = os.path.basename(file_path)
     logger.info(f"🔄 Processing {filename}")
@@ -311,18 +316,31 @@ def post_process_html(file_path: str, tags_to_remove: List[str], blacklist: List
                 logger.info(f"🚫 Post-scrape blacklist match: '{first_line[:60]}...' matched terms: {blacklist_matches}")
                 os.remove(md_file_path)
                 logger.info(f"🗑️  Deleted {os.path.basename(md_file_path)} due to blacklist match")
-                return  # Skip the rest of processing
+                return None  # Skip the rest of processing
 
         # Remove the original HTML file
         os.remove(file_path)
 
         logger.info(f"✅ Processed {filename}")
 
+        # Queue LLM processing if configured
+        if pasture_config:
+            try:
+                from core.llm_processor import get_global_processor
+                processor = get_global_processor()
+                if processor:
+                    processor.enqueue(md_file_path, pasture_config)
+            except Exception as e:
+                logger.warning(f"Failed to queue LLM processing: {e}")
+
+        return md_file_path
+
     except Exception as e:
         logger.error(f"❌ Failed to process {filename}: {e}")
         # Keep the original HTML file if processing fails
         if os.path.exists(file_path):
             logger.info(f"📁 Keeping original HTML file")
+        return None
 
 
 def create_driver_with_retry(max_retries: int = 3) -> webdriver.Firefox:
@@ -432,7 +450,7 @@ def categorize_error(error: Exception) -> str:
 
 
 def scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: List[str] = None,
-               source: str = None, stats_tracker: StatsTracker = None) -> bool:
+               source: str = None, stats_tracker: StatsTracker = None, pasture_config: dict = None) -> bool:
     """Scrapes the content of a URL using Selenium.
 
     Args:
@@ -442,6 +460,7 @@ def scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: 
         blacklist: Optional list of blacklist terms to check against scraped content
         source: Optional source name for error tracking
         stats_tracker: Optional StatsTracker instance for collecting statistics
+        pasture_config: Optional pasture configuration for LLM processing
 
     Returns:
         True if scraping was successful, False otherwise
@@ -470,7 +489,7 @@ def scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: 
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(html)
 
-        post_process_html(file_path, tags_to_remove, blacklist)
+        post_process_html(file_path, tags_to_remove, blacklist, pasture_config)
         logger.info(f"✅ Scraped: {url}")
         return True
 
@@ -483,7 +502,7 @@ def scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: 
         # Try fallback for timeout, DNS, or driver issues
         if error_type in ('timeout', 'dns', 'driver'):
             logger.info("🔄 Attempting fallback method")
-            return fallback_scrape_url(url, output_dir, tags_to_remove, blacklist, source, stats_tracker)
+            return fallback_scrape_url(url, output_dir, tags_to_remove, blacklist, source, stats_tracker, pasture_config)
         return False
 
     finally:
@@ -601,7 +620,7 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stat
                 continue
 
             if pasture.should_scrape_url(external_url, processed_urls):
-                if scrape_url(external_url, output_dir, tags_to_remove, blacklist, pasture.name, stats_tracker):
+                if scrape_url(external_url, output_dir, tags_to_remove, blacklist, pasture.name, stats_tracker, pasture.config):
                     pasture.mark_url_processed(external_url, processed_urls)
                     new_urls_scraped += 1
                     # Track successful scrape
@@ -610,7 +629,7 @@ def scrape_pasture(pasture, base_output_dir: str, processed_urls: Set[str], stat
                 else:
                     logger.warning(f"❌ Failed: {external_url}")
                     # Try fallback method
-                    if fallback_scrape_url(external_url, output_dir, tags_to_remove, blacklist, pasture.name, stats_tracker):
+                    if fallback_scrape_url(external_url, output_dir, tags_to_remove, blacklist, pasture.name, stats_tracker, pasture.config):
                         pasture.mark_url_processed(external_url, processed_urls)
                         new_urls_scraped += 1
                         # Track successful scrape
@@ -660,7 +679,7 @@ def is_media_url(url: str) -> bool:
 
 
 def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str], blacklist: List[str] = None,
-                        source: str = None, stats_tracker: StatsTracker = None) -> bool:
+                        source: str = None, stats_tracker: StatsTracker = None, pasture_config: dict = None) -> bool:
     """Fallback scraping method using requests + BeautifulSoup for simple sites.
 
     Args:
@@ -670,6 +689,7 @@ def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str], bl
         blacklist: Optional list of blacklist terms to check against scraped content
         source: Optional source name for error tracking
         stats_tracker: Optional StatsTracker instance for collecting statistics
+        pasture_config: Optional pasture configuration for LLM processing
 
     Returns:
         True if scraping was successful, False otherwise
@@ -708,7 +728,7 @@ def fallback_scrape_url(url: str, output_dir: str, tags_to_remove: List[str], bl
             f.write(response.text)
 
         # Process the HTML
-        post_process_html(file_path, tags_to_remove, blacklist)
+        post_process_html(file_path, tags_to_remove, blacklist, pasture_config)
         logger.info(f"✅ Fallback scraped: {url}")
         return True
 

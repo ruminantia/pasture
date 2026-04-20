@@ -80,8 +80,8 @@ def scan_scraped_content(output_base_dir: str) -> Dict[str, Any]:
 
         # Walk through year/month/day structure
         for root, dirs, files in os.walk(source_path):
-            # Only process directories that contain .md files
-            md_files = [f for f in files if f.endswith(".md")]
+            # Only process directories that contain .md files (exclude .llm.md files)
+            md_files = [f for f in files if f.endswith(".md") and not f.endswith(".llm.md")]
             if not md_files:
                 continue
 
@@ -173,13 +173,36 @@ def extract_article_metadata(file_path: str, source: str, date_str: str, base_di
     except:
         scraped_at = date_str + "T00:00:00"
 
+    # Check LLM status
+    llm_status = "unknown"
+    llm_file_path = os.path.splitext(file_path)[0] + ".llm.md"
+    if os.path.exists(llm_file_path):
+        # Check if file has content
+        try:
+            if os.path.getsize(llm_file_path) > 0:
+                llm_status = "completed"
+        except Exception:
+            pass
+    else:
+        # Check status tracker for pending/processing/failed
+        try:
+            from core.llm_status import get_global_tracker
+            tracker = get_global_tracker()
+            if tracker:
+                tracked_status = tracker.get_status(file_name)
+                if tracked_status in ("pending", "processing", "failed"):
+                    llm_status = tracked_status
+        except Exception:
+            pass
+
     return {
         "id": file_id,
         "title": title,
         "source": source,
         "file_path": rel_path,
         "scraped_at": scraped_at,
-        "preview": preview
+        "preview": preview,
+        "llm_status": llm_status
     }
 
 
@@ -414,7 +437,16 @@ def create_index_html(viewer_dir: str) -> None:
         </div>
 
         <div class="source-filters">
-            <button class="filter-btn active" data-source="all">All</button>
+            <div class="filter-scroll">
+                <button class="filter-btn active" data-source="all">All</button>
+            </div>
+            <div class="llm-toggle-wrapper">
+                <span class="llm-toggle-label">post-processing</span>
+                <label class="llm-switch">
+                    <input type="checkbox" id="llm-mode-switch">
+                    <span class="llm-slider"></span>
+                </label>
+            </div>
         </div>
 
         <div class="main-content">
@@ -568,6 +600,18 @@ header h1 {
 
 .header-controls button:hover {
     background: var(--bg-hover);
+}
+
+.llm-indicator {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .calendar-overlay {
@@ -1174,8 +1218,35 @@ header h1 {
 .source-filters {
     margin-bottom: 20px;
     display: flex;
+    align-items: center;
     gap: 10px;
-    flex-wrap: wrap;
+}
+
+.filter-scroll {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) var(--bg-secondary);
+}
+
+.filter-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+.filter-scroll::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 3px;
+}
+
+.filter-scroll::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+.filter-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
 }
 
 .filter-btn {
@@ -1198,6 +1269,66 @@ header h1 {
     border-color: var(--accent);
 }
 
+.llm-toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.llm-toggle-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.llm-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 22px;
+}
+
+.llm-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.llm-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border);
+    transition: .3s;
+    border-radius: 22px;
+}
+
+.llm-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: var(--text-secondary);
+    transition: .3s;
+    border-radius: 50%;
+}
+
+.llm-switch input:checked + .llm-slider {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.llm-switch input:checked + .llm-slider:before {
+    transform: translateX(22px);
+    background-color: white;
+}
+
 .main-content {
     display: grid;
     grid-template-columns: 350px 1fr;
@@ -1214,7 +1345,9 @@ header h1 {
 }
 
 .article-item {
+    position: relative;
     padding: 12px;
+    padding-right: 35px;
     margin-bottom: 10px;
     background: var(--bg-primary);
     border: 1px solid var(--border);
@@ -1258,6 +1391,41 @@ header h1 {
     line-height: 1.4;
     word-wrap: break-word;
     overflow-wrap: break-word;
+}
+
+.llm-status {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    border-radius: 50%;
+}
+
+.llm-status.llm-completed {
+    color: #4caf50;
+}
+
+.llm-status.llm-processing {
+    color: #ff9800;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.llm-status.llm-failed {
+    color: #f44336;
+}
+
+.llm-status.llm-pending {
+    color: #9e9e9e;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
 .viewer {
@@ -1681,7 +1849,8 @@ const state = {
     allRejectionSources: new Set(),
     errors: [],
     allErrorTypes: new Set(),
-    allErrorSources: new Set()
+    allErrorSources: new Set(),
+    llmMode: false
 };
 
 // Initialize
@@ -1702,6 +1871,23 @@ function setupTheme() {
         const next = current === 'light' ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', next);
         localStorage.setItem('theme', next);
+    });
+
+    // LLM mode toggle switch
+    const llmSwitch = document.getElementById('llm-mode-switch');
+    // LLM mode enabled by default, but allow localStorage override
+    const savedLlmMode = localStorage.getItem('llmMode');
+    state.llmMode = savedLlmMode === null ? true : savedLlmMode === 'true';
+    llmSwitch.checked = state.llmMode;
+
+    llmSwitch.addEventListener('change', () => {
+        state.llmMode = llmSwitch.checked;
+        localStorage.setItem('llmMode', state.llmMode);
+
+        // Reload the current article if one is selected
+        if (state.selectedArticle) {
+            selectArticle(state.selectedArticle);
+        }
     });
 
     // Rebuild UI button
@@ -2030,11 +2216,15 @@ function renderCalendar() {
 
 function renderSourceFilters() {
     const container = document.querySelector('.source-filters');
+    const scrollContainer = container.querySelector('.filter-scroll');
 
-    // Clear except "All" button
-    while (container.children.length > 1) {
-        container.removeChild(container.lastChild);
-    }
+    // Remove only filter-btn elements (preserve "All" button)
+    const filterBtns = scrollContainer.querySelectorAll('.filter-btn');
+    filterBtns.forEach(btn => {
+        if (btn.dataset.source !== 'all') {  // Keep "All" button
+            scrollContainer.removeChild(btn);
+        }
+    });
 
     // Add source buttons
     if (state.indexData && state.indexData.sources) {
@@ -2044,7 +2234,7 @@ function renderSourceFilters() {
             button.dataset.source = source;
             button.textContent = source;
             button.addEventListener('click', () => filterBySource(source));
-            container.appendChild(button);
+            scrollContainer.appendChild(button);
         });
     }
 }
@@ -2094,10 +2284,24 @@ function renderArticleList(articles) {
         item.className = 'article-item';
         item.dataset.id = article.id;
 
+        // Determine LLM status indicator
+        const llmStatus = article.llm_status || 'unknown';
+        let statusIcon = '';
+        if (llmStatus === 'completed') {
+            statusIcon = '<span class="llm-status llm-completed" title="LLM processed">✓</span>';
+        } else if (llmStatus === 'processing') {
+            statusIcon = '<span class="llm-status llm-processing" title="Processing...">⏳</span>';
+        } else if (llmStatus === 'failed') {
+            statusIcon = '<span class="llm-status llm-failed" title="Processing failed">✗</span>';
+        } else if (llmStatus === 'pending') {
+            statusIcon = '<span class="llm-status llm-pending" title="Pending">○</span>';
+        }
+
         item.innerHTML = `
             <div class="article-source">${article.source}</div>
             <div class="article-title">${escapeHtml(article.title)}</div>
             <div class="article-preview">${escapeHtml(article.preview)}</div>
+            ${statusIcon}
         `;
 
         item.addEventListener('click', () => selectArticle(article));
@@ -2120,10 +2324,33 @@ async function selectArticle(article) {
     const viewer = document.getElementById('article-content');
     viewer.innerHTML = '<div class="loading">Loading article...</div>';
 
-    const content = await loadArticle(article.file_path);
+    // Determine which file to load based on LLM mode
+    let filePath = article.file_path;
+    let isLlmVersion = false;
+
+    if (state.llmMode) {
+        // Try to load the LLM processed version
+        const llmPath = article.file_path.replace('.md', '.llm.md');
+        const llmContent = await loadArticle(llmPath);
+        if (llmContent) {
+            filePath = llmPath;
+            isLlmVersion = true;
+        }
+        // If LLM version doesn't exist, fall back to raw
+    }
+
+    const content = await loadArticle(filePath);
     if (content) {
         const html = marked.parse(content);
         viewer.innerHTML = html;
+
+        // Add indicator for LLM mode
+        if (isLlmVersion) {
+            const indicator = document.createElement('div');
+            indicator.className = 'llm-indicator';
+            indicator.textContent = '🤖 LLM Cleaned';
+            viewer.insertBefore(indicator, viewer.firstChild);
+        }
     } else {
         viewer.innerHTML = '<div class="error">Failed to load article</div>';
     }
@@ -2853,6 +3080,46 @@ function filterErrors() {
         </div>
     `).join('');
 }
+
+// LLM Status Polling
+let llmPollInterval = null;
+
+async function checkLlmStatus() {
+    try {
+        const response = await fetch('/api/llm-stats');
+        if (!response.ok) {
+            console.warn('LLM stats API returned error:', response.status);
+            return;
+        }
+        const data = await response.json();
+
+        // Check if there are any processing or pending items
+        const statusData = data.status || {};
+        const hasActiveItems = Object.values(statusData).some(
+            status => status === 'processing' || status === 'pending'
+        );
+
+        // Refresh the current day's article list if we have active items
+        if (hasActiveItems && state.currentDate) {
+            loadDailyData(state.currentDate);
+        }
+
+        // Update polling interval based on activity
+        if (hasActiveItems && !llmPollInterval) {
+            // Start polling every 5 seconds
+            llmPollInterval = setInterval(checkLlmStatus, 5000);
+        } else if (!hasActiveItems && llmPollInterval) {
+            // Stop polling when no active items
+            clearInterval(llmPollInterval);
+            llmPollInterval = null;
+        }
+    } catch (error) {
+        console.error('Failed to check LLM status:', error);
+    }
+}
+
+// Start checking LLM status periodically
+setInterval(checkLlmStatus, 10000); // Check every 10 seconds
 """
 
     js_path = os.path.join(assets_dir, "app.js")
@@ -3182,6 +3449,42 @@ def start_http_server(output_base_dir: str, port: int = 8000) -> None:
                         'success': False,
                         'error': str(e)
                     }
+                    self.wfile.write(json.dumps(error_data).encode('utf-8'))
+                return
+
+            # LLM stats API endpoint
+            if self.path == '/api/llm-stats':
+                try:
+                    from core.llm_processor import get_global_processor
+                    from core.llm_status import get_global_tracker
+
+                    stats_data = {
+                        'processor': None,
+                        'status': {}
+                    }
+
+                    # Get processor stats if available
+                    processor = get_global_processor()
+                    if processor:
+                        stats_data['processor'] = processor.get_stats()
+
+                    # Get status tracker data if available
+                    tracker = get_global_tracker()
+                    if tracker:
+                        stats_data['status'] = tracker.get_all_status()
+
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(stats_data).encode('utf-8'))
+                except Exception as e:
+                    logger.error(f"Failed to fetch LLM stats: {e}")
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    error_data = {'error': str(e)}
                     self.wfile.write(json.dumps(error_data).encode('utf-8'))
                 return
 

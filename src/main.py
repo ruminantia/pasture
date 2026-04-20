@@ -15,6 +15,8 @@ from core.scraper import (
 )
 from core.stats import StatsTracker
 from core.config_reload import trigger_config_reload, wait_for_reload, clear_reload
+from core.llm_processor import init_global_processor, shutdown_global_processor
+from core.llm_status import init_global_tracker
 
 
 # Set up logging - centralized configuration to avoid duplicates
@@ -97,6 +99,41 @@ def setup_logging():
 logger = setup_logging()
 
 
+def load_llm_config(config: configparser.ConfigParser) -> Dict[str, Any]:
+    """Load LLM configuration from the [llm] section.
+
+    Args:
+        config: Configuration parser
+
+    Returns:
+        Dictionary with LLM settings
+    """
+    llm_config = {
+        'enabled': False,
+        'base_url': None,
+        'model': 'gemma',
+        'temperature': 1.0,
+        'timeout': 600,
+        'system_prompt': None
+    }
+
+    if 'llm' in config:
+        llm_section = config['llm']
+        llm_config['enabled'] = llm_section.getboolean('enabled', False)
+        llm_config['base_url'] = llm_section.get('base_url', None)
+        llm_config['model'] = llm_section.get('model', 'gemma')
+        llm_config['temperature'] = llm_section.getfloat('temperature', 1.0)
+        llm_config['timeout'] = llm_section.getint('timeout', 600)
+        llm_config['system_prompt'] = llm_section.get('system_prompt', None)
+
+        # Validate required fields
+        if llm_config['enabled'] and not llm_config['base_url']:
+            logger.warning("LLM enabled but no base_url configured, disabling LLM")
+            llm_config['enabled'] = False
+
+    return llm_config
+
+
 def run_single_scrape(config: configparser.ConfigParser) -> None:
     """Run a single scrape of all configured pastures.
 
@@ -116,6 +153,9 @@ def run_single_scrape(config: configparser.ConfigParser) -> None:
 
     for section in config.sections():
         if section == "global":
+            continue
+        # Skip non-pasture sections (like llm config)
+        if not config[section].get('type'):
             continue
 
         try:
@@ -203,6 +243,9 @@ def setup_scheduler(config: configparser.ConfigParser) -> None:
     for section in config.sections():
         if section == "global":
             continue
+        # Skip non-pasture sections (like llm config)
+        if not config[section].get('type'):
+            continue
 
         interval = config[section].get("interval", "60").strip()
         try:
@@ -241,7 +284,7 @@ def reload_config_and_reschedule(old_config: configparser.ConfigParser = None) -
     old_pastures = {}
     if old_config:
         for section in old_config.sections():
-            if section != "global":
+            if section != "global" and old_config[section].get('type'):
                 old_pastures[section] = dict(old_config[section])
 
     # Reload config file
@@ -265,6 +308,9 @@ def reload_config_and_reschedule(old_config: configparser.ConfigParser = None) -
     new_or_modified = []
     for section in config.sections():
         if section == "global":
+            continue
+        # Skip non-pasture sections (like llm config)
+        if not config[section].get('type'):
             continue
 
         if section not in old_pastures:
@@ -318,7 +364,7 @@ def should_run_scheduled_mode(config: configparser.ConfigParser) -> bool:
     return any(
         config[section].get("interval")
         for section in config.sections()
-        if section != "global" and config[section].get("interval")
+        if section != "global" and config[section].get('type') and config[section].get("interval")
     )
 
 
@@ -326,6 +372,20 @@ def main() -> None:
     """Main function to run the pasture scraper."""
     config = configparser.ConfigParser()
     config.read("config.ini")
+
+    output_base_dir = "output"
+
+    # Initialize LLM status tracker
+    init_global_tracker(output_base_dir)
+
+    # Load LLM configuration
+    llm_config = load_llm_config(config)
+
+    # Initialize LLM processor if enabled
+    llm_processor = None
+    if llm_config['enabled']:
+        llm_processor = init_global_processor(llm_config, num_workers=1)
+        logger.info(f"🤖 LLM processor initialized: {llm_config['base_url']}")
 
     # Start HTTP server for web viewer
     try:
@@ -335,30 +395,43 @@ def main() -> None:
     except Exception as e:
         logger.error(f"❌ Failed to start web viewer HTTP server: {e}")
 
-    if should_run_scheduled_mode(config):
-        # Run initial scrape
-        run_single_scrape(config)
+    try:
+        if should_run_scheduled_mode(config):
+            # Run initial scrape
+            run_single_scrape(config)
 
-        # Set up scheduler
-        setup_scheduler(config)
+            # Set up scheduler
+            setup_scheduler(config)
 
-        logger.info("🔄 Scheduler started - Press Ctrl+C to exit")
-        try:
-            while True:
-                # Check for config reload event
-                if wait_for_reload(timeout=0.1):  # Non-blocking check
-                    logger.info("🔄 Config reload requested, rescheduling...")
-                    clear_reload()
-                    # Pass old config for comparison
-                    config = reload_config_and_reschedule(old_config=config)
+            logger.info("🔄 Scheduler started - Press Ctrl+C to exit")
+            try:
+                while True:
+                    # Check for config reload event
+                    if wait_for_reload(timeout=0.1):  # Non-blocking check
+                        logger.info("🔄 Config reload requested, rescheduling...")
+                        clear_reload()
+                        # Pass old config for comparison
+                        config = reload_config_and_reschedule(old_config=config)
+                        # Reload LLM config
+                        llm_config = load_llm_config(config)
+                        if llm_config['enabled']:
+                            init_global_processor(llm_config, num_workers=1)
+                            logger.info(f"🤖 LLM processor reloaded")
+                        else:
+                            shutdown_global_processor()
+                            logger.info("🤖 LLM processor disabled")
 
-                schedule.run_pending()
-                time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("🛑 Scheduler stopped")
-    else:
-        # Run single scrape
-        run_single_scrape(config)
+                    schedule.run_pending()
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                logger.info("🛑 Scheduler stopped")
+        else:
+            # Run single scrape
+            run_single_scrape(config)
+    finally:
+        # Shutdown LLM processor on exit
+        shutdown_global_processor()
+        logger.info("🤖 LLM processor shutdown")
 
 
 if __name__ == "__main__":
